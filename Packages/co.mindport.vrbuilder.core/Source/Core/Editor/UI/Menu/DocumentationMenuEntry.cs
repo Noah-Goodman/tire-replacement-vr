@@ -1,0 +1,21 @@
+// Copyright (c) 2013-2019 Innoactive GmbH
+// Licensed under the Apache License, Version 2.0
+// Modifications copyright (c) 2021-2026 MindPort GmbH
+
+using UnityEditor;
+using UnityEngine;
+
+namespace VRBuilder.Core.Editor.Menu
+{
+    internal static class DocumentationMenuEntry
+    {
+        /// <summary>
+        /// Allows opening the URL to Creator Documentation.
+        /// </summary>
+        [MenuItem("Tools/VR Builder/Help/Manual", false, 79)]
+        private static void OpenDocumentation()
+        {
+            Application.OpenURL("https://mindport-gmbh.github.io/VR-Builder-Documentation?utm_source=unity_editor&utm_medium=referral&utm_campaign=from_unity&utm_id=from_unity");
+        }
+    }
+}
