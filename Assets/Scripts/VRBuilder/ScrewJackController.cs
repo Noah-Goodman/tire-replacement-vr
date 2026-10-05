@@ -20,6 +20,7 @@ namespace TireTraining
         public float LiftHeight => liftHeight;
         public bool IsFullyRaised => liftHeight >= maximumLift - 0.001f;
         public bool IsFullyLowered => liftHeight <= 0.001f;
+        private bool TargetReached => lowering ? IsFullyLowered : IsFullyRaised;
 
         private const string GeneratedName = "_GeneratedJack";
         private float liftHeight;
@@ -30,6 +31,7 @@ namespace TireTraining
         private XRSimpleInteractable crankGrip;
         private SnappableProperty jackSnappable;
         private bool crankingEnabled;
+        private bool lowering;
         private Transform selectingHand;
         private Vector3 previousDirection;
         private Quaternion previousHandRotation;
@@ -83,7 +85,7 @@ namespace TireTraining
                 return;
 
             bool canCrank = crankingEnabled && jackSnappable != null
-                && jackSnappable.IsSnapped && !IsFullyRaised;
+                && jackSnappable.IsSnapped && !TargetReached;
             if (crankGrip.enabled != canCrank)
                 crankGrip.enabled = canCrank;
             if (!canCrank)
@@ -133,20 +135,24 @@ namespace TireTraining
             ApplyHeight();
         }
 
-        /// <summary>Called by the active VR Builder jack-cranking condition.</summary>
-        public void SetCrankingEnabled(bool enabled)
+        /// <summary>
+        /// Called by the active VR Builder jack-cranking condition. The crank stays
+        /// usable until the jack reaches full height, or the ground when lowering.
+        /// </summary>
+        public void SetCrankingEnabled(bool enabled, bool lowerCar = false)
         {
             crankingEnabled = enabled;
+            lowering = lowerCar;
             if (!enabled)
                 selectingHand = null;
             if (crankGrip != null)
                 crankGrip.enabled = enabled && jackSnappable != null
-                    && jackSnappable.IsSnapped && !IsFullyRaised;
+                    && jackSnappable.IsSnapped && !TargetReached;
         }
 
         private void OnSelected(SelectEnterEventArgs args)
         {
-            if (!crankingEnabled || jackSnappable == null || !jackSnappable.IsSnapped || IsFullyRaised)
+            if (!crankingEnabled || jackSnappable == null || !jackSnappable.IsSnapped || TargetReached)
                 return;
 
             selectingHand = args.interactorObject.transform;

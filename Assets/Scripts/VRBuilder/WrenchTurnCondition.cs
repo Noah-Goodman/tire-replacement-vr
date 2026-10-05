@@ -37,6 +37,10 @@ namespace TireTraining
             [DisplayName("Remove lug nut after turn")]
             public bool RemovalPass { get; set; }
 
+            [DataMember]
+            [DisplayName("Tighten replacement lug nut")]
+            public bool TighteningPass { get; set; }
+
             public bool IsCompleted { get; set; }
 
             [IgnoreDataMember]
@@ -65,6 +69,10 @@ namespace TireTraining
                 {
                     pivot.GetComponent<SnappedWrenchTurn>()?.BeginUnscrewing();
                 }
+                else if (Data.TighteningPass && Data.BoltNumber == 1)
+                {
+                    pivot.GetComponent<SnappedWrenchTurn>()?.BeginTightening();
+                }
 
                 axis = pivot.forward;
                 previousDirection = pivot.right;
@@ -82,6 +90,16 @@ namespace TireTraining
                     }
 
                     return turn != null && turn.RemovedBolts >= Data.BoltNumber;
+                }
+
+                if (Data.TighteningPass)
+                {
+                    if (turn != null && Data.BoltNumber == 1 && !turn.IsTighteningBolts)
+                    {
+                        turn.BeginTightening();
+                    }
+
+                    return turn != null && turn.TightenedBolts >= Data.BoltNumber;
                 }
 
                 if (turn != null && Data.Counterclockwise)
@@ -112,6 +130,7 @@ namespace TireTraining
             Data.Counterclockwise = true;
             Data.BoltNumber = 1;
             Data.RemovalPass = false;
+            Data.TighteningPass = false;
         }
 
         public override IStageProcess GetActiveProcess()

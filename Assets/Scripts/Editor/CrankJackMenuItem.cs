@@ -5,7 +5,7 @@ using VRBuilder.Core.Editor.UI.StepInspector.Menu;
 public class CrankJackMenuItem : MenuItem<ICondition>
 {
     public override string DisplayedName { get; } =
-        "Tire Training/Crank Jack to Full Height";
+        "Tire Training/Crank Jack";
 
     public override ICondition GetNewItem()
     {

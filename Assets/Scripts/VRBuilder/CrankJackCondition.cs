@@ -13,18 +13,22 @@ namespace TireTraining
     [DataContract(IsReference = true)]
     public class CrankJackCondition : Condition<CrankJackCondition.EntityData>
     {
-        [DisplayName("Crank Jack to Full Height")]
+        [DisplayName("Crank Jack")]
         public class EntityData : IConditionData
         {
             [DataMember]
             [DisplayName("Screw jack")]
             public SingleSceneObjectReference Jack { get; set; }
 
+            [DataMember]
+            [DisplayName("Lower car to ground")]
+            public bool LowerCar { get; set; }
+
             public bool IsCompleted { get; set; }
 
             [IgnoreDataMember]
             [HideInProcessInspector]
-            public string Name => "Crank jack to full height";
+            public string Name => LowerCar ? "Crank jack down to ground" : "Crank jack to full height";
 
             public Metadata Metadata { get; set; }
         }
@@ -42,12 +46,12 @@ namespace TireTraining
                 if (jack == null)
                     Debug.LogError("Crank Jack condition needs a Process Scene Object with ScrewJackController.");
                 else
-                    jack.SetCrankingEnabled(true);
+                    jack.SetCrankingEnabled(true, Data.LowerCar);
             }
 
             protected override bool CheckIfCompleted()
             {
-                return jack != null && jack.IsFullyRaised;
+                return jack != null && (Data.LowerCar ? jack.IsFullyLowered : jack.IsFullyRaised);
             }
 
             public override void End()
@@ -62,6 +66,7 @@ namespace TireTraining
         public CrankJackCondition()
         {
             Data.Jack = new SingleSceneObjectReference(Guid.Empty);
+            Data.LowerCar = false;
         }
 
         public override IStageProcess GetActiveProcess()
