@@ -6,8 +6,8 @@ using VRBuilder.XRInteraction.Properties;
 namespace TireTraining
 {
     /// <summary>
-    /// VR screw jack. Grip the yellow crank knob and turn around the vertical
-    /// screw axis. Clockwise raises the saddle and car; reverse lowers them.
+    /// VR screw jack. Grip the yellow crank knob on the negative-Z side and turn
+    /// in the local XY plane. Clockwise viewed from that side raises the car; reverse lowers it.
     /// Geometry is generated so the fused source jack mesh is not required.
     /// </summary>
     [ExecuteAlways]
@@ -97,7 +97,8 @@ namespace TireTraining
             if (selectingHand == null || crank == null)
                 return;
 
-            Vector3 axis = transform.up;
+            // Positive local Z gives clockwise motion when viewed from the negative-Z side.
+            Vector3 axis = transform.forward;
             Vector3 direction = Vector3.ProjectOnPlane(selectingHand.position - crank.position, axis);
             float orbitDelta = 0f;
             if (direction.sqrMagnitude > 0.0001f)
@@ -121,7 +122,7 @@ namespace TireTraining
             float oldHeight = liftHeight;
             liftHeight = Mathf.Clamp(liftHeight + delta * maximumLift / degreesPerFullLift, 0f, maximumLift);
             float acceptedDegrees = (liftHeight - oldHeight) * degreesPerFullLift / maximumLift;
-            crank.Rotate(Vector3.up, acceptedDegrees, Space.Self);
+            crank.Rotate(Vector3.forward, acceptedDegrees, Space.Self);
             ApplyHeight();
             if (oldHeight < maximumLift && IsFullyRaised)
                 Debug.Log("Jack fully raised. Place the jack stands before removing the wheel.", this);
@@ -156,7 +157,7 @@ namespace TireTraining
                 return;
 
             selectingHand = args.interactorObject.transform;
-            Vector3 direction = Vector3.ProjectOnPlane(selectingHand.position - crank.position, transform.up);
+            Vector3 direction = Vector3.ProjectOnPlane(selectingHand.position - crank.position, transform.forward);
             previousDirection = direction.sqrMagnitude > 0.0001f ? direction.normalized : Vector3.zero;
             previousHandRotation = selectingHand.rotation;
         }
@@ -210,13 +211,17 @@ namespace TireTraining
             AddBlock("Jack point cue", saddle, new Vector3(0f, 0.043f, 0f),
                 new Vector3(0.27f, 0.012f, 0.22f), cueMaterial);
 
+            // The drive shaft projects out of the negative-Z face of the housing.
+            AddBlock("Crank drive shaft", generated.transform, new Vector3(0f, 0.35f, -0.25f),
+                new Vector3(0.04f, 0.04f, 0.5f), metalMaterial);
+
             crank = new GameObject("Rotating crank").transform;
             crank.SetParent(generated.transform, false);
-            crank.localPosition = new Vector3(0f, 0.35f, 0f);
+            crank.localPosition = new Vector3(0f, 0.35f, -0.5f);
             AddBlock("Crank arm", crank, new Vector3(0.19f, 0f, 0f),
                 new Vector3(0.38f, 0.035f, 0.04f), metalMaterial);
             GameObject knob = AddBlock("Grip and rotate clockwise to raise", crank,
-                new Vector3(0.38f, 0.07f, 0f), new Vector3(0.095f, 0.16f, 0.095f), cueMaterial);
+                new Vector3(0.38f, 0f, -0.07f), new Vector3(0.095f, 0.095f, 0.16f), cueMaterial);
 
             if (Application.isPlaying)
             {
