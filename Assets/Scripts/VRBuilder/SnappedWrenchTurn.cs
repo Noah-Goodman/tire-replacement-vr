@@ -675,7 +675,7 @@ namespace TireTraining
 
         private void OnGripReleased(SelectExitEventArgs args)
         {
-            if ((removingBolts || tighteningBolts) && !turnCompleted)
+            if (!turnCompleted)
             {
                 Debug.Log($"Lug nut {CurrentNutIndex + 1} turn progress: {DegreesTurned:0} of {requiredDegrees:0} degrees.", this);
             }

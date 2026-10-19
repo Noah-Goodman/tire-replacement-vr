@@ -20,6 +20,13 @@ namespace TireTraining
         public float LiftHeight => liftHeight;
         public bool IsFullyRaised => liftHeight >= maximumLift - 0.001f;
         public bool IsFullyLowered => liftHeight <= 0.001f;
+
+        /// <summary>
+        /// Total degrees the learner has turned the crank, positive toward
+        /// raising. It counts turns the height clamp rejects, so a wrong-way
+        /// turn at the bottom or top of travel still registers.
+        /// </summary>
+        public float CrankDegrees { get; private set; }
         private bool TargetReached => lowering ? IsFullyLowered : IsFullyRaised;
 
         private const string GeneratedName = "_GeneratedJack";
@@ -119,6 +126,7 @@ namespace TireTraining
             float delta = Mathf.Abs(orbitDelta) >= Mathf.Abs(wristDelta) ? orbitDelta : wristDelta;
             if (Mathf.Abs(delta) > 60f) return;
 
+            CrankDegrees += delta;
             float oldHeight = liftHeight;
             liftHeight = Mathf.Clamp(liftHeight + delta * maximumLift / degreesPerFullLift, 0f, maximumLift);
             float acceptedDegrees = (liftHeight - oldHeight) * degreesPerFullLift / maximumLift;

@@ -36,7 +36,7 @@ TagManager:
   - 
   - 
   - 
-  - 
+  - TeleportBlocker
   - Teleport
   m_SortingLayers:
   - name: Default
