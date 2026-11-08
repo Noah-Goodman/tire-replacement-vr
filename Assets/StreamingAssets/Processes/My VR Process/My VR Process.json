@@ -7145,8 +7145,8 @@
                 "$id": "1243",
                 "$type": "VRBuilder.Core.ViewTransform, VRBuilder.Core",
                 "Position": {
-                  "x": -24.0,
-                  "y": 302.0,
+                  "x": 242.0,
+                  "y": 307.0,
                   "z": 0.0
                 },
                 "Scale": {
