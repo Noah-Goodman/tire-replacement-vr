@@ -24,6 +24,8 @@ namespace TireTraining
 
         private const int RetryDelayMs = 5000;
 
+        private static bool returningToLobby;
+
         /// <summary>The role this device joined with. <see cref="Role.None"/> until <see cref="Join"/> accepts a role.</summary>
         public static Role ChosenRole = Role.None;
 
@@ -292,6 +294,24 @@ namespace TireTraining
         /// </summary>
         public static async void ReturnToLobby(string message)
         {
+            // A second call (for example two role rejections) must not shut down or load twice.
+            if (returningToLobby)
+            {
+                return;
+            }
+
+            returningToLobby = true;
+            UnityEngine.Events.UnityAction<Scene, LoadSceneMode> clear = null;
+            clear = (scene, mode) =>
+            {
+                if (scene.buildIndex == LobbySceneIndex)
+                {
+                    returningToLobby = false;
+                    SceneManager.sceneLoaded -= clear;
+                }
+            };
+            SceneManager.sceneLoaded += clear;
+
             LobbyMessage = message;
             ChosenRole = Role.None;
 
