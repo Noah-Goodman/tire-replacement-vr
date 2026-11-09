@@ -23,6 +23,7 @@ namespace TireTraining
 
         private const float ResendIntervalSeconds = 0.5f;
         private const float WarnAfterSeconds = 5f;
+        private const float ConfirmWindowSeconds = 1.5f;
 
         // Local reconcile state; not networked.
         private bool reconciling;
@@ -30,6 +31,7 @@ namespace TireTraining
         private bool warned;
         private TickTimer resendTimer;
         private TickTimer warnTimer;
+        private TickTimer confirmTimer;
 
         public override void Spawned()
         {
@@ -224,11 +226,17 @@ namespace TireTraining
             warned = false;
             resendTimer = default;
             warnTimer = default;
+            confirmTimer = default;
         }
 
         /// <summary>
         /// Compares the desired role_fetcher and role_assembler values with the session properties and resends
         /// them at most once per <see cref="ResendIntervalSeconds"/> until they match.
+        /// SessionInfo.Properties changes only when the server confirms an update, so a match right after a send
+        /// can be a stale value that the in-flight update is about to overwrite. After a send, the reconcile
+        /// therefore keeps running until the values match and <see cref="ConfirmWindowSeconds"/> have passed since
+        /// the last send; a confirmation that makes the values differ inside the window takes the resend path.
+        /// A match with no send since the reconcile started stops at once.
         /// The return value of UpdateCustomProperties is not used: it is false both when nothing changed and when
         /// an update is dropped, and an update that quickly follows another one can be dropped. Only the session
         /// properties show whether an update took.
@@ -256,6 +264,11 @@ namespace TireTraining
 
             if (hasFetcher && hasAssembler && currentFetcher == desiredFetcher && currentAssembler == desiredAssembler)
             {
+                if (confirmTimer.IsRunning && !confirmTimer.Expired(Runner))
+                {
+                    return;
+                }
+
                 StopReconciling();
                 return;
             }
@@ -279,6 +292,7 @@ namespace TireTraining
             if (resendTimer.ExpiredOrNotRunning(Runner))
             {
                 resendTimer = TickTimer.CreateFromSeconds(Runner, ResendIntervalSeconds);
+                confirmTimer = TickTimer.CreateFromSeconds(Runner, ConfirmWindowSeconds);
                 info.UpdateCustomProperties(new Dictionary<string, SessionProperty>
                 {
                     [fetcherKey] = desiredFetcher,
