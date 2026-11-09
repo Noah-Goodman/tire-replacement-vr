@@ -245,9 +245,17 @@ namespace TireTraining
 
         private static Task<StartGameResult> StartSharedGame(NetworkRunner runner)
         {
+            // Fusion only updates custom properties that already exist, so both role keys must exist when the session is created (0 = free).
+            Dictionary<string, SessionProperty> sessionProperties = new Dictionary<string, SessionProperty>
+            {
+                { Role.Fetcher.GetSessionPropertyKey(), 0 },
+                { Role.Assembler.GetSessionPropertyKey(), 0 }
+            };
+
             return runner.StartGame(new StartGameArgs
             {
                 GameMode = GameMode.Shared,
+                SessionProperties = sessionProperties,
                 SessionName = SessionName,
                 Scene = SceneRef.FromIndex(MainSceneIndex),
                 SceneManager = runner.GetComponent<NetworkSceneManagerDefault>(),

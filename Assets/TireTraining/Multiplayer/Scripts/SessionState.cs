@@ -21,6 +21,16 @@ namespace TireTraining
         [Networked, OnChangedRender(nameof(OnRolesChanged))] public PlayerRef Fetcher { get; set; }
         [Networked, OnChangedRender(nameof(OnRolesChanged))] public PlayerRef Assembler { get; set; }
 
+        private const float ResendIntervalSeconds = 0.5f;
+        private const float WarnAfterSeconds = 5f;
+
+        // Local reconcile state; not networked.
+        private bool reconciling;
+        private bool diverged;
+        private bool warned;
+        private TickTimer resendTimer;
+        private TickTimer warnTimer;
+
         public override void Spawned()
         {
             Instance = this;
@@ -36,6 +46,7 @@ namespace TireTraining
 
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
+            StopReconciling();
             if (Instance == this)
             {
                 Instance = null;
@@ -140,6 +151,7 @@ namespace TireTraining
         {
             if (!Object.HasStateAuthority)
             {
+                StopReconciling();
                 return;
             }
 
@@ -186,25 +198,110 @@ namespace TireTraining
             }
         }
 
-        /// <summary>Writes role_fetcher and role_assembler to the session properties. State authority only.</summary>
+        /// <summary>Starts reconciling the session properties with the roles and runs the first check now. State authority only.</summary>
         private void PublishSessionProperties()
         {
+            reconciling = true;
+            Reconcile();
+        }
+
+        /// <summary>
+        /// Runs on every simulated tick while this device has state authority, because a scene NetworkObject's
+        /// state authority is simulated and TickTimer counts runner ticks. A device without authority stops reconciling.
+        /// </summary>
+        public override void FixedUpdateNetwork()
+        {
+            if (reconciling)
+            {
+                Reconcile();
+            }
+        }
+
+        private void StopReconciling()
+        {
+            reconciling = false;
+            diverged = false;
+            warned = false;
+            resendTimer = default;
+            warnTimer = default;
+        }
+
+        /// <summary>
+        /// Compares the desired role_fetcher and role_assembler values with the session properties and resends
+        /// them at most once per <see cref="ResendIntervalSeconds"/> until they match.
+        /// The return value of UpdateCustomProperties is not used: it is false both when nothing changed and when
+        /// an update is dropped, and an update that quickly follows another one can be dropped. Only the session
+        /// properties show whether an update took.
+        /// </summary>
+        private void Reconcile()
+        {
+            if (!Object.HasStateAuthority)
+            {
+                StopReconciling();
+                return;
+            }
+
             SessionInfo info = Runner.SessionInfo;
             if (info == null || !info.IsValid)
             {
                 return;
             }
 
-            var properties = new Dictionary<string, SessionProperty>
-            {
-                [Role.Fetcher.GetSessionPropertyKey()] = Fetcher.IsNone ? 0 : RoleInfo.TakenValue,
-                [Role.Assembler.GetSessionPropertyKey()] = Assembler.IsNone ? 0 : RoleInfo.TakenValue
-            };
+            int desiredFetcher = Fetcher.IsNone ? 0 : RoleInfo.TakenValue;
+            int desiredAssembler = Assembler.IsNone ? 0 : RoleInfo.TakenValue;
+            string fetcherKey = Role.Fetcher.GetSessionPropertyKey();
+            string assemblerKey = Role.Assembler.GetSessionPropertyKey();
+            bool hasFetcher = TryGetInt(info, fetcherKey, out int currentFetcher);
+            bool hasAssembler = TryGetInt(info, assemblerKey, out int currentAssembler);
 
-            if (!info.UpdateCustomProperties(properties))
+            if (hasFetcher && hasAssembler && currentFetcher == desiredFetcher && currentAssembler == desiredAssembler)
             {
-                Debug.LogWarning("SessionState: could not update the session properties.");
+                StopReconciling();
+                return;
             }
+
+            if (!diverged)
+            {
+                diverged = true;
+                warned = false;
+                warnTimer = TickTimer.CreateFromSeconds(Runner, WarnAfterSeconds);
+            }
+
+            if (!warned && warnTimer.Expired(Runner))
+            {
+                warned = true;
+                Debug.LogWarning(
+                    $"SessionState: session properties still differ from the roles. " +
+                    $"{fetcherKey}: desired {desiredFetcher}, current {Describe(hasFetcher, currentFetcher)}; " +
+                    $"{assemblerKey}: desired {desiredAssembler}, current {Describe(hasAssembler, currentAssembler)}.");
+            }
+
+            if (resendTimer.ExpiredOrNotRunning(Runner))
+            {
+                resendTimer = TickTimer.CreateFromSeconds(Runner, ResendIntervalSeconds);
+                info.UpdateCustomProperties(new Dictionary<string, SessionProperty>
+                {
+                    [fetcherKey] = desiredFetcher,
+                    [assemblerKey] = desiredAssembler
+                });
+            }
+        }
+
+        private static bool TryGetInt(SessionInfo info, string key, out int value)
+        {
+            value = 0;
+            if (info.Properties == null || !info.Properties.TryGetValue(key, out SessionProperty property) || !property.IsInt)
+            {
+                return false;
+            }
+
+            value = (int)property;
+            return true;
+        }
+
+        private static string Describe(bool present, int value)
+        {
+            return present ? value.ToString() : "missing";
         }
     }
 }
