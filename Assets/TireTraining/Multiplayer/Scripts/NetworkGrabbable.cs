@@ -67,6 +67,11 @@ namespace TireTraining
 
         private bool HasState => spawned && Object != null && Object.IsValid;
 
+        /// <summary>
+        /// True between <see cref="Spawned"/> and <see cref="Despawned"/>, while the networked properties can be read.
+        /// </summary>
+        public bool IsSpawned => HasState;
+
         public override void Spawned()
         {
             spawned = true;
