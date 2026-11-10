@@ -136,11 +136,12 @@ namespace TireTraining
             NetworkObject spawned = null;
             if (avatarPrefab != null)
             {
-                Vector3 position = spawn != null ? spawn.position : Vector3.zero;
-                Quaternion rotation = spawn != null ? spawn.rotation : Quaternion.identity;
                 try
                 {
-                    spawned = runner.Spawn(avatarPrefab, position, rotation, null, (r, obj) =>
+                    // The avatar's root stays at the world origin on every device. Its own pose isn't networked,
+                    // and the NetworkTransforms on the head and hands send poses relative to it, so a root placed
+                    // at the spawn point would shift and turn the head and hands on the other player's device.
+                    spawned = runner.Spawn(avatarPrefab, Vector3.zero, Quaternion.identity, null, (r, obj) =>
                     {
                         NetworkAvatar avatar = obj.GetComponent<NetworkAvatar>();
                         if (avatar != null)
