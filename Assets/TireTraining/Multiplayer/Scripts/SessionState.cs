@@ -21,6 +21,24 @@ namespace TireTraining
         [Networked, OnChangedRender(nameof(OnRolesChanged))] public PlayerRef Fetcher { get; set; }
         [Networked, OnChangedRender(nameof(OnRolesChanged))] public PlayerRef Assembler { get; set; }
 
+        /// <summary>Raised on this device after the training progress changes and when this object spawns.</summary>
+        public event Action ProgressChanged;
+
+        /// <summary>
+        /// Raised on every device, the sender's included, when <see cref="RPC_Celebrate"/> arrives. The argument is the
+        /// index of the chapter that was just completed. Static so a scene component can subscribe before this object spawns.
+        /// </summary>
+        public static event Action<int> Celebrated;
+
+        /// <summary>Index of the chapter the Assembler's process is in.</summary>
+        [Networked, OnChangedRender(nameof(OnProgressChanged))] public int Chapter { get; set; }
+
+        /// <summary>True once the Assembler's process has finished.</summary>
+        [Networked, OnChangedRender(nameof(OnProgressChanged))] public NetworkBool Finished { get; set; }
+
+        /// <summary>Name of the step the Assembler's process is in; empty when there is none.</summary>
+        [Networked, OnChangedRender(nameof(OnProgressChanged))] public NetworkString<_64> Step { get; set; }
+
         private const float ResendIntervalSeconds = 0.5f;
         private const float WarnAfterSeconds = 5f;
         private const float ConfirmWindowSeconds = 1.5f;
@@ -44,6 +62,7 @@ namespace TireTraining
             }
 
             RolesChanged?.Invoke();
+            ProgressChanged?.Invoke();
         }
 
         public override void Despawned(NetworkRunner runner, bool hasState)
@@ -58,6 +77,48 @@ namespace TireTraining
         private void OnRolesChanged()
         {
             RolesChanged?.Invoke();
+        }
+
+        private void OnProgressChanged()
+        {
+            ProgressChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Sent by the Assembler's device whenever its process starts a chapter or step or finishes. The state
+        /// authority stores the values. A negative chapter is ignored. A report with finished false does not clear
+        /// Finished unless the chapter also changes, so a late step report cannot undo a finished process.
+        /// </summary>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_ReportProgress(int chapter, NetworkString<_64> step, NetworkBool finished)
+        {
+            if (chapter < 0)
+            {
+                return;
+            }
+
+            bool chapterChanged = chapter != Chapter;
+            if (chapterChanged)
+            {
+                Chapter = chapter;
+            }
+
+            Step = step;
+
+            if (finished || chapterChanged)
+            {
+                Finished = finished;
+            }
+        }
+
+        /// <summary>
+        /// Tells every device to play the celebration. <paramref name="chapter"/> is the index of the chapter that
+        /// was just completed, which is the checklist row that just got ticked.
+        /// </summary>
+        [Rpc(RpcSources.All, RpcTargets.All)]
+        public void RPC_Celebrate(int chapter)
+        {
+            Celebrated?.Invoke(chapter);
         }
 
         /// <summary>The player holding <paramref name="role"/>, or <see cref="PlayerRef.None"/>.</summary>

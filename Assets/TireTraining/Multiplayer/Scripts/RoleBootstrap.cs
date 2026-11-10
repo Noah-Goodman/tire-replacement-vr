@@ -54,6 +54,7 @@ namespace TireTraining
         private void OnDestroy()
         {
             destroyed = true;
+            LocalRole = Role.None;
         }
 
         private bool Abandoned(NetworkRunner runner)
