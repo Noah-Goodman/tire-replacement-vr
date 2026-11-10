@@ -39,6 +39,12 @@ namespace TireTraining
         /// <summary>Name of the step the Assembler's process is in; empty when there is none.</summary>
         [Networked, OnChangedRender(nameof(OnProgressChanged))] public NetworkString<_64> Step { get; set; }
 
+        /// <summary>Raised on this device after <see cref="MirrorFlags"/> changes and when this object spawns.</summary>
+        public event Action MirrorFlagsChanged;
+
+        /// <summary>Bit i is set when mirrored object i is active on the Assembler's device.</summary>
+        [Networked, OnChangedRender(nameof(OnMirrorFlagsChanged))] public int MirrorFlags { get; set; }
+
         private const float ResendIntervalSeconds = 0.5f;
         private const float WarnAfterSeconds = 5f;
         private const float ConfirmWindowSeconds = 1.5f;
@@ -63,6 +69,7 @@ namespace TireTraining
 
             RolesChanged?.Invoke();
             ProgressChanged?.Invoke();
+            MirrorFlagsChanged?.Invoke();
         }
 
         public override void Despawned(NetworkRunner runner, bool hasState)
@@ -82,6 +89,35 @@ namespace TireTraining
         private void OnProgressChanged()
         {
             ProgressChanged?.Invoke();
+        }
+
+        private void OnMirrorFlagsChanged()
+        {
+            MirrorFlagsChanged?.Invoke();
+        }
+
+        /// <summary>True when bit <paramref name="index"/> of <see cref="MirrorFlags"/> is set; false for an index outside 0-31.</summary>
+        public bool GetMirrorFlag(int index)
+        {
+            if (index < 0 || index > 31)
+            {
+                return false;
+            }
+
+            return (MirrorFlags & (1 << index)) != 0;
+        }
+
+        /// <summary>Sets or clears one mirror flag. The state authority stores it. An index outside 0-31 is ignored.</summary>
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        public void RPC_SetMirrorFlag(int index, NetworkBool active)
+        {
+            if (index < 0 || index > 31)
+            {
+                return;
+            }
+
+            int bit = 1 << index;
+            MirrorFlags = active ? (MirrorFlags | bit) : (MirrorFlags & ~bit);
         }
 
         /// <summary>

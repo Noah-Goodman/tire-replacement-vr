@@ -8,8 +8,8 @@ using VRBuilder.Core;
 namespace TireTraining
 {
     /// <summary>
-    /// Always-visible list of the process chapters. Item N is checked when the
-    /// process starts a later chapter, and every item is checked when the process finishes.
+    /// Always-visible list of the process chapters. Item N is checked when
+    /// <see cref="SessionState.Chapter"/> is past N, and every item is checked once <see cref="SessionState.Finished"/> is set.
     /// Each child of <see cref="itemsRoot"/> is one item, read in hierarchy order, with
     /// <c>Box</c>, <c>Box/Fill</c>, <c>Box/Checkmark</c> and <c>Label</c> children.
     /// Items map to chapters by index, so their order must match the process chapter order.
@@ -41,6 +41,8 @@ namespace TireTraining
 
         private Item[] items = Array.Empty<Item>();
         private bool[] completed = Array.Empty<bool>();
+        private SessionState bound;
+        private bool warnedCount;
 
         private void Awake()
         {
@@ -78,36 +80,69 @@ namespace TireTraining
 
         private void OnEnable()
         {
-            ProcessRunner.Events.ChapterStarted += OnChapterStarted;
-            ProcessRunner.Events.ProcessFinished += OnProcessFinished;
+            Bind();
         }
 
         private void OnDisable()
         {
-            ProcessRunner.Events.ChapterStarted -= OnChapterStarted;
-            ProcessRunner.Events.ProcessFinished -= OnProcessFinished;
+            Unbind();
         }
 
-        private void OnChapterStarted(object sender, ProcessEventArgs args)
+        private void OnDestroy()
         {
-            var chapters = args.Process.Data.Chapters;
-            if (chapters.Count != items.Length)
+            Unbind();
+        }
+
+        private void Update()
+        {
+            if (bound != SessionState.Instance)
             {
-                Debug.LogWarning($"Chapter checklist has {items.Length} items but the process has {chapters.Count} chapters.", this);
+                Bind();
             }
 
-            int current = chapters.IndexOf(args.Process.Data.Current);
-            for (int i = 0; i < items.Length; i++)
+            if (!warnedCount && ProcessRunner.Current != null)
             {
-                SetCompleted(i, i < current);
+                warnedCount = true;
+                int chapterCount = ProcessRunner.Current.Data.Chapters.Count;
+                if (chapterCount != items.Length)
+                {
+                    Debug.LogWarning($"Chapter checklist has {items.Length} items but the process has {chapterCount} chapters.", this);
+                }
             }
         }
 
-        private void OnProcessFinished(object sender, ProcessEventArgs args)
+        private void Bind()
         {
+            Unbind();
+            bound = SessionState.Instance;
+            if (bound != null)
+            {
+                bound.ProgressChanged += ApplyProgress;
+                ApplyProgress();
+            }
+        }
+
+        private void Unbind()
+        {
+            if (bound != null)
+            {
+                bound.ProgressChanged -= ApplyProgress;
+                bound = null;
+            }
+        }
+
+        private void ApplyProgress()
+        {
+            if (bound == null)
+            {
+                return;
+            }
+
+            bool finished = bound.Finished;
+            int chapter = bound.Chapter;
             for (int i = 0; i < items.Length; i++)
             {
-                SetCompleted(i, true);
+                SetCompleted(i, finished || i < chapter);
             }
         }
 
