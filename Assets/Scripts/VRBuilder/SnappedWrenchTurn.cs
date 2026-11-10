@@ -26,6 +26,13 @@ namespace TireTraining
         [SerializeField] private SnapZoneProperty lugNutSnapZone;
         [SerializeField] private Transform replacementNuts;
 
+        /// <summary>
+        /// True when this device may change nut, wrench and wheel state from local input: the Assembler's device,
+        /// or any device when no multiplayer session exists. Read at the time of use, because the role is set after Awake.
+        /// </summary>
+        private static bool LocalMayChangeState =>
+            SessionLauncher.Runner == null || RoleBootstrap.LocalRole == Role.Assembler;
+
         public float DegreesTurned { get; private set; }
         public int CompletedBolts { get; private set; }
         public int RemovedBolts { get; private set; }
@@ -109,6 +116,18 @@ namespace TireTraining
         {
             if (wrench == null || turnGrip == null)
             {
+                return;
+            }
+
+            if (!LocalMayChangeState)
+            {
+                // Nut and wrench state arrive over the network here; the grip stays unusable.
+                if (turnGrip.enabled)
+                {
+                    turnGrip.enabled = false;
+                }
+
+                selectingHand = null;
                 return;
             }
 
@@ -550,6 +569,11 @@ namespace TireTraining
 
         private void OnWheelSelected(SelectEnterEventArgs args)
         {
+            if (!LocalMayChangeState)
+            {
+                return;
+            }
+
             wheelWasGrabbed = true;
             wheelWithNuts.SetParent(null, true);
             EndWheelHighlight();
@@ -557,6 +581,11 @@ namespace TireTraining
 
         private void OnWheelReleased(SelectExitEventArgs args)
         {
+            if (!LocalMayChangeState)
+            {
+                return;
+            }
+
             if (!wheelWasGrabbed)
             {
                 return;
@@ -660,7 +689,7 @@ namespace TireTraining
 
         private void OnGripSelected(SelectEnterEventArgs args)
         {
-            if (wrench == null || !wrench.IsSnapped || turnCompleted)
+            if (!LocalMayChangeState || wrench == null || !wrench.IsSnapped || turnCompleted)
             {
                 return;
             }
@@ -675,6 +704,11 @@ namespace TireTraining
 
         private void OnGripReleased(SelectExitEventArgs args)
         {
+            if (!LocalMayChangeState)
+            {
+                return;
+            }
+
             if (!turnCompleted)
             {
                 Debug.Log($"Lug nut {CurrentNutIndex + 1} turn progress: {DegreesTurned:0} of {requiredDegrees:0} degrees.", this);

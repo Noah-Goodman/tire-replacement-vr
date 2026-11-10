@@ -27,10 +27,28 @@ namespace TireTraining
         /// turn at the bottom or top of travel still registers.
         /// </summary>
         public float CrankDegrees { get; private set; }
+
+        /// <summary>Lift height from 0 (on the ground) to 1 (fully raised).</summary>
+        public float HeightNormalized => liftHeight / maximumLift;
+
+        /// <summary>Visual angle of the crank around its shaft, in degrees. Unlike <see cref="CrankDegrees"/>, it counts only turns the height clamp accepted.</summary>
+        public float CrankAngle => crankAngle;
+
+        /// <summary>True while a VR Builder condition has the crank enabled.</summary>
+        public bool CrankingEnabled => crankingEnabled;
+
+        /// <summary>
+        /// True when this device may change jack state from local input: the Assembler's device, or any device
+        /// when no multiplayer session exists. Read at the time of use, because the role is set after Awake.
+        /// </summary>
+        private static bool LocalMayChangeState =>
+            SessionLauncher.Runner == null || RoleBootstrap.LocalRole == Role.Assembler;
+
         private bool TargetReached => lowering ? IsFullyLowered : IsFullyRaised;
 
         private const string GeneratedName = "_GeneratedJack";
         private float liftHeight;
+        private float crankAngle;
         private Vector3 carStartPosition;
         private Transform saddle;
         private Transform threadedScrew;
@@ -91,7 +109,7 @@ namespace TireTraining
             if (!Application.isPlaying || crankGrip == null)
                 return;
 
-            bool canCrank = crankingEnabled && jackSnappable != null
+            bool canCrank = LocalMayChangeState && crankingEnabled && jackSnappable != null
                 && jackSnappable.IsSnapped && !TargetReached;
             if (crankGrip.enabled != canCrank)
                 crankGrip.enabled = canCrank;
@@ -131,6 +149,7 @@ namespace TireTraining
             liftHeight = Mathf.Clamp(liftHeight + delta * maximumLift / degreesPerFullLift, 0f, maximumLift);
             float acceptedDegrees = (liftHeight - oldHeight) * degreesPerFullLift / maximumLift;
             crank.Rotate(Vector3.forward, acceptedDegrees, Space.Self);
+            crankAngle += acceptedDegrees;
             ApplyHeight();
             if (oldHeight < maximumLift && IsFullyRaised)
                 Debug.Log("Jack fully raised. Place the jack stands before removing the wheel.", this);
@@ -142,6 +161,14 @@ namespace TireTraining
         {
             liftHeight = Mathf.Clamp01(normalizedHeight) * maximumLift;
             ApplyHeight();
+        }
+
+        /// <summary>Turns the generated crank to <paramref name="degrees"/> around its shaft. Used to show another device's crank angle.</summary>
+        public void SetCrankAngle(float degrees)
+        {
+            crankAngle = degrees;
+            if (crank != null)
+                crank.localRotation = Quaternion.Euler(0f, 0f, degrees);
         }
 
         /// <summary>
@@ -161,7 +188,7 @@ namespace TireTraining
 
         private void OnSelected(SelectEnterEventArgs args)
         {
-            if (!crankingEnabled || jackSnappable == null || !jackSnappable.IsSnapped || TargetReached)
+            if (!LocalMayChangeState || !crankingEnabled || jackSnappable == null || !jackSnappable.IsSnapped || TargetReached)
                 return;
 
             selectingHand = args.interactorObject.transform;
@@ -226,6 +253,7 @@ namespace TireTraining
             crank = new GameObject("Rotating crank").transform;
             crank.SetParent(generated.transform, false);
             crank.localPosition = new Vector3(0f, 0.35f, -0.5f);
+            crankAngle = 0f;
             AddBlock("Crank arm", crank, new Vector3(0.19f, 0f, 0f),
                 new Vector3(0.38f, 0.035f, 0.04f), metalMaterial);
             GameObject knob = AddBlock("Grip and rotate clockwise to raise", crank,
