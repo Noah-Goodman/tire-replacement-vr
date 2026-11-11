@@ -1,6 +1,8 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using VRBuilder.Core.Highlighting;
 using VRBuilder.XRInteraction.Properties;
 
 namespace TireTraining
@@ -63,6 +65,8 @@ namespace TireTraining
         private Material metalMaterial;
         private Material darkMaterial;
         private Material cueMaterial;
+        private Transform generatedRoot;
+        private Coroutine highlighterRefresh;
 
         private void OnEnable()
         {
@@ -90,6 +94,8 @@ namespace TireTraining
 
             crankGrip.selectEntered.AddListener(OnSelected);
             crankGrip.selectExited.AddListener(OnReleased);
+
+            RefreshHighlighter();
         }
 
         private void OnDisable()
@@ -102,6 +108,54 @@ namespace TireTraining
             }
             selectingHand = null;
             DestroyGenerated();
+        }
+
+        /// <summary>
+        /// Rebuilds the jack highlighter's cached renderers and highlight mesh so they cover the generated parts.
+        /// The highlighter may have cached renderers of an earlier build, which are destroyed. Play Mode only:
+        /// in edit mode the refresh would write unsaved parts into the scene's serialized renderer list.
+        /// A highlighter that is highlighting ignores the refresh, so it is retried once the highlight ends.
+        /// A jack without a highlighter needs none, because the highlighter VR Builder adds on first use caches the current parts.
+        /// </summary>
+        private void RefreshHighlighter()
+        {
+            CancelHighlighterRefresh();
+            if (!Application.isPlaying)
+                return;
+
+            // An InteractableHighlighter is a DefaultHighlighter, and a GameObject holds at most one,
+            // which is the one HighlightProperty uses.
+            DefaultHighlighter highlighter = GetComponent<DefaultHighlighter>();
+            if (!CanRefreshHighlighter(highlighter, generatedRoot))
+                return;
+
+            if (highlighter.IsHighlighting)
+                highlighterRefresh = StartCoroutine(RefreshHighlighterWhenIdle(highlighter, generatedRoot));
+            else
+                highlighter.ForceRefreshCachedRenderers();
+        }
+
+        private bool CanRefreshHighlighter(DefaultHighlighter highlighter, Transform generation) =>
+            Application.isPlaying && isActiveAndEnabled && highlighter != null
+            && generation != null && generation == generatedRoot && generation.gameObject.activeInHierarchy;
+
+        private IEnumerator RefreshHighlighterWhenIdle(DefaultHighlighter highlighter, Transform generation)
+        {
+            while (CanRefreshHighlighter(highlighter, generation) && highlighter.IsHighlighting)
+                yield return null;
+
+            highlighterRefresh = null;
+            if (CanRefreshHighlighter(highlighter, generation))
+                highlighter.ForceRefreshCachedRenderers();
+        }
+
+        private void CancelHighlighterRefresh()
+        {
+            if (highlighterRefresh == null)
+                return;
+
+            StopCoroutine(highlighterRefresh);
+            highlighterRefresh = null;
         }
 
         private void Update()
@@ -226,6 +280,7 @@ namespace TireTraining
             DestroyGenerated();
             var generated = new GameObject(GeneratedName);
             generated.transform.SetParent(transform, false);
+            generatedRoot = generated.transform;
             if (!Application.isPlaying)
                 generated.hideFlags = HideFlags.DontSaveInEditor;
 
@@ -296,10 +351,23 @@ namespace TireTraining
 
         private void DestroyGenerated()
         {
-            Transform existing = transform.Find(GeneratedName);
-            if (existing != null)
+            // Component disable leaves coroutines running unless they are explicitly stopped.
+            CancelHighlighterRefresh();
+            generatedRoot = null;
+            for (int i = transform.childCount - 1; i >= 0; i--)
             {
-                if (Application.isPlaying) Destroy(existing.gameObject);
+                Transform existing = transform.GetChild(i);
+                if (existing.name != GeneratedName)
+                    continue;
+
+                if (Application.isPlaying)
+                {
+                    // Destroy waits until frame end. Keep outgoing parts out of renderer searches
+                    // and prevent another same-frame rebuild from finding them as the current root.
+                    existing.name = GeneratedName + " (Destroying)";
+                    existing.gameObject.SetActive(false);
+                    Destroy(existing.gameObject);
+                }
                 else DestroyImmediate(existing.gameObject);
             }
             saddle = null;
