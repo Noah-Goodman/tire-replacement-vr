@@ -5540,6 +5540,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TireTraining.ReparentOnAwake
   newParent: {fileID: 1833115594}
+--- !u!114 &470626753
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 470626736}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c865bcf5e2b354872bc0e7aa40c81b4e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TireTraining.FetchItemTag
+  item: 4
 --- !u!1 &475033761
 GameObject:
   m_ObjectHideFlags: 0
@@ -6411,6 +6424,19 @@ MonoBehaviour:
   - {fileID: 520915446}
   - {fileID: 520915445}
   ForceRemoteRenderTimeframe: 0
+--- !u!114 &520915448
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 520915433}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c865bcf5e2b354872bc0e7aa40c81b4e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TireTraining.FetchItemTag
+  item: 1
 --- !u!1001 &529742403
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -6529,6 +6555,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 71021ca6e95ed4f9cafe30fbc4329088, type: 3}
       insertIndex: -1
       addedObject: {fileID: 520915445}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 71021ca6e95ed4f9cafe30fbc4329088, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 520915448}
   m_SourcePrefab: {fileID: 100100000, guid: 71021ca6e95ed4f9cafe30fbc4329088, type: 3}
 --- !u!1 &538386555
 GameObject:
@@ -7288,6 +7317,8 @@ MonoBehaviour:
     _length: 0
     _data:
       Data: 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+  stepText: {fileID: 11400000, guid: ac07498e738fe49b2980c101f38b3036, type: 2}
+  _Needed: 0
   _MirrorFlags: 0
 --- !u!114 &584030909
 MonoBehaviour:
@@ -11641,6 +11672,7 @@ GameObject:
   - component: {fileID: 843830113}
   - component: {fileID: 843830112}
   - component: {fileID: 843830111}
+  - component: {fileID: 843830121}
   m_Layer: 0
   m_Name: LugNutTray
   m_TagString: Untagged
@@ -12006,6 +12038,19 @@ MonoBehaviour:
   serializedGuid:
     serializedGuid: b45b4d870cab2e4f9fd9e128934f496b
   guids: []
+--- !u!114 &843830121
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 843830109}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c865bcf5e2b354872bc0e7aa40c81b4e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TireTraining.FetchItemTag
+  item: 5
 --- !u!1 &849494726
 GameObject:
   m_ObjectHideFlags: 0
@@ -15524,6 +15569,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 125260, guid: 812e3f763be51a143bb1d937f48c31f2, type: 3}
       insertIndex: -1
       addedObject: {fileID: 470626752}
+    - targetCorrespondingSourceObject: {fileID: 125260, guid: 812e3f763be51a143bb1d937f48c31f2, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 470626753}
   m_SourcePrefab: {fileID: 100100000, guid: 812e3f763be51a143bb1d937f48c31f2, type: 3}
 --- !u!1 &1073687832
 GameObject:
@@ -26550,6 +26598,7 @@ GameObject:
   - component: {fileID: 2026805067}
   - component: {fileID: 2026805066}
   - component: {fileID: 2026805065}
+  - component: {fileID: 2026805068}
   m_Layer: 0
   m_Name: Wheel
   m_TagString: Untagged
@@ -26984,6 +27033,19 @@ MonoBehaviour:
   - {fileID: 2026805066}
   - {fileID: 2026805065}
   ForceRemoteRenderTimeframe: 0
+--- !u!114 &2026805068
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2026805053}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c865bcf5e2b354872bc0e7aa40c81b4e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TireTraining.FetchItemTag
+  item: 3
 --- !u!4 &2028298835 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 475332, guid: 812e3f763be51a143bb1d937f48c31f2, type: 3}
@@ -27995,6 +28057,7 @@ GameObject:
   - component: {fileID: 7000000014}
   - component: {fileID: 7000000013}
   - component: {fileID: 7000000012}
+  - component: {fileID: 7000000016}
   m_Layer: 0
   m_Name: ScrewJack
   m_TagString: Untagged
@@ -28409,6 +28472,19 @@ MonoBehaviour:
   - {fileID: 7000000013}
   - {fileID: 7000000012}
   ForceRemoteRenderTimeframe: 0
+--- !u!114 &7000000016
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7000000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c865bcf5e2b354872bc0e7aa40c81b4e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TireTraining.FetchItemTag
+  item: 2
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
