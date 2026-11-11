@@ -39,6 +39,14 @@ namespace TireTraining
         /// <summary>Name of the step the Assembler's process is in; empty when there is none.</summary>
         [Networked, OnChangedRender(nameof(OnProgressChanged))] public NetworkString<_64> Step { get; set; }
 
+        [Tooltip("The asset that maps steps to role texts and items.")]
+        [SerializeField] private RoleStepText stepText;
+
+        /// <summary>The item the Fetcher works with in the current step, looked up in the step text asset.</summary>
+        [Networked, OnChangedRender(nameof(OnProgressChanged))] public FetchItem Needed { get; set; }
+
+        private bool warnedNoStepText;
+
         /// <summary>Raised on this device after <see cref="MirrorFlags"/> changes and when this object spawns.</summary>
         public event Action MirrorFlagsChanged;
 
@@ -140,6 +148,20 @@ namespace TireTraining
             }
 
             Step = step;
+
+            if (stepText != null)
+            {
+                Needed = stepText.GetItem(Chapter, step.ToString());
+            }
+            else
+            {
+                Needed = FetchItem.None;
+                if (!warnedNoStepText)
+                {
+                    warnedNoStepText = true;
+                    Debug.LogWarning("SessionState: no RoleStepText assigned; Needed stays None.", this);
+                }
+            }
 
             if (finished || chapterChanged)
             {
