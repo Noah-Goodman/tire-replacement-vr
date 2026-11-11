@@ -19,207 +19,247 @@ MonoBehaviour:
       car and hand it over.'
     assemblerText: 'Fetcher is bringing: lug wrench'
     item: 1
+    handoff: 1
   - chapter: 0
     stepName: Place wrench on lug bolt 1
     fetcherText: The Assembler is putting the wrench on the first lug bolt.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 0
     stepName: Loosen lug bolt 1
     fetcherText: The Assembler is loosening each lug bolt one turn. Next you bring
       the screw jack.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 0
     stepName: Loosen lug bolt 2
     fetcherText: The Assembler is loosening each lug bolt one turn. Next you bring
       the screw jack.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 0
     stepName: Loosen lug bolt 3
     fetcherText: The Assembler is loosening each lug bolt one turn. Next you bring
       the screw jack.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 0
     stepName: Loosen lug bolt 4
     fetcherText: The Assembler is loosening each lug bolt one turn. Next you bring
       the screw jack.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 0
     stepName: Loosen lug bolt 5
     fetcherText: The Assembler is loosening each lug bolt one turn. Next you bring
       the screw jack.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 0
     stepName: End Ch1
     fetcherText: Next you bring the screw jack.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 1
     stepName: Hand over the screw jack
     fetcherText: 'Assembler needs: screw jack. Bring it from the workbench to the
       car and hand it over.'
     assemblerText: 'Fetcher is bringing: screw jack'
     item: 2
+    handoff: 1
   - chapter: 1
     stepName: Place car jack under car
     fetcherText: The Assembler is placing the jack under the car.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 1
     stepName: Crank jack to lift car
     fetcherText: The Assembler is raising the car.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 1
     stepName: End Ch2
     fetcherText: Next the Assembler takes the wheel off and hands it to you.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 2
     stepName: Unscrew lug nut 1
     fetcherText: The Assembler is removing the lug nuts. Next you take the old wheel.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 2
     stepName: Unscrew lug nut 2
     fetcherText: The Assembler is removing the lug nuts. Next you take the old wheel.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 2
     stepName: Unscrew lug nut 3
     fetcherText: The Assembler is removing the lug nuts. Next you take the old wheel.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 2
     stepName: Unscrew lug nut 4
     fetcherText: The Assembler is removing the lug nuts. Next you take the old wheel.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 2
     stepName: Unscrew lug nut 5
     fetcherText: The Assembler is removing the lug nuts. Next you take the old wheel.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 2
     stepName: Take off wheel
     fetcherText: The Assembler is taking the wheel off. Get ready to take it.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 2
     stepName: Hand the old wheel to the Fetcher
     fetcherText: Take the old wheel from the Assembler.
     assemblerText: Hand the old wheel to the Fetcher
     item: 3
+    handoff: 2
   - chapter: 2
     stepName: Store the old wheel on the garage tire rack
     fetcherText: Carry the old wheel to the garage and put it on the tire rack.
     assemblerText: Fetcher is storing the old wheel
     item: 3
+    handoff: 0
   - chapter: 2
     stepName: End Ch3
     fetcherText: Next you bring the replacement wheel.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 3
     stepName: Hand over the replacement wheel
     fetcherText: 'Assembler needs: replacement wheel. Bring it from beside the workbench
       to the car and hand it over.'
     assemblerText: 'Fetcher is bringing: replacement wheel'
     item: 4
+    handoff: 1
   - chapter: 3
     stepName: Place wheel
     fetcherText: The Assembler is putting the new wheel on the hub. Next you bring
       the lug nut tray.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 3
     stepName: Hand over the lug nut tray
     fetcherText: 'Assembler needs: lug nut tray. Bring it from the workbench to the
       car and hand it over.'
     assemblerText: 'Fetcher is bringing: lug nut tray'
     item: 5
+    handoff: 1
   - chapter: 3
     stepName: Move nuts into place
     fetcherText: The new lug nuts are going onto the wheel.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 3
     stepName: Put wrench into place
     fetcherText: The Assembler is putting the wrench on the first lug nut.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 3
     stepName: Tighten lug nut 1
     fetcherText: The Assembler is snugging each lug nut one turn.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 3
     stepName: Tighten lug nut 2
     fetcherText: The Assembler is snugging each lug nut one turn.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 3
     stepName: Tighten lug nut 3
     fetcherText: The Assembler is snugging each lug nut one turn.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 3
     stepName: Tighten lug nut 4
     fetcherText: The Assembler is snugging each lug nut one turn.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 3
     stepName: Tighten lug nut 5
     fetcherText: The Assembler is snugging each lug nut one turn.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 3
     stepName: End Ch4
     fetcherText: Next the Assembler lowers the car and hands you the jack.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 4
     stepName: Crank jack to lower car
     fetcherText: The Assembler is lowering the car. Next you take the jack.
     assemblerText: 
     item: 0
+    handoff: 0
   - chapter: 4
     stepName: Hand the jack to the Fetcher
     fetcherText: Take the jack from the Assembler.
     assemblerText: Hand the jack to the Fetcher
     item: 2
+    handoff: 2
   - chapter: 4
     stepName: Tighten lug nut 1
     fetcherText: Put the jack on the RETURN JACK spot in the garage.
     assemblerText: 
     item: 2
+    handoff: 0
   - chapter: 4
     stepName: Tighten lug nut 3
     fetcherText: Put the jack on the RETURN JACK spot in the garage.
     assemblerText: 
     item: 2
+    handoff: 0
   - chapter: 4
     stepName: Tighten lug nut 5
     fetcherText: Put the jack on the RETURN JACK spot in the garage.
     assemblerText: 
     item: 2
+    handoff: 0
   - chapter: 4
     stepName: Tighten lug nut 2
     fetcherText: Put the jack on the RETURN JACK spot in the garage.
     assemblerText: 
     item: 2
+    handoff: 0
   - chapter: 4
     stepName: Tighten lug nut 4
     fetcherText: Put the jack on the RETURN JACK spot in the garage.
     assemblerText: 
     item: 2
+    handoff: 0
   - chapter: 4
     stepName: End Ch5
     fetcherText: Put the jack on the RETURN JACK spot in the garage to finish.
     assemblerText: Waiting for the Fetcher to return the jack
     item: 2
+    handoff: 0

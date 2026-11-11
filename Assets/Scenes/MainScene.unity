@@ -5159,6 +5159,54 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: ae25ad3401fb4f849b7ec9995d3c20e4, type: 3}
   m_PrefabInstance: {fileID: 893228305}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &462184161
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 462184162}
+  - component: {fileID: 462184163}
+  m_Layer: 0
+  m_Name: FetcherOnly
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &462184162
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 462184161}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1354153025}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &462184163
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 462184161}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 839c8acab2b2343c0aa77abd4037daf0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TireTraining.RoleGate
+  activeFor: 1
+  objects:
+  - {fileID: 154909908}
+  behaviours: []
 --- !u!1 &470626736 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 125260, guid: 812e3f763be51a143bb1d937f48c31f2, type: 3}
@@ -5553,6 +5601,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TireTraining.FetchItemTag
   item: 4
+--- !u!114 &470626754
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 470626736}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ccb3edf8bdbb46cbbeaccab084ec7ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TireTraining.RoleGrabGate
+  startsAtCar: 0
 --- !u!1 &475033761
 GameObject:
   m_ObjectHideFlags: 0
@@ -6437,6 +6498,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TireTraining.FetchItemTag
   item: 1
+--- !u!114 &520915449
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 520915433}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ccb3edf8bdbb46cbbeaccab084ec7ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TireTraining.RoleGrabGate
+  startsAtCar: 0
 --- !u!1001 &529742403
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -6558,6 +6632,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 71021ca6e95ed4f9cafe30fbc4329088, type: 3}
       insertIndex: -1
       addedObject: {fileID: 520915448}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 71021ca6e95ed4f9cafe30fbc4329088, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 520915449}
   m_SourcePrefab: {fileID: 100100000, guid: 71021ca6e95ed4f9cafe30fbc4329088, type: 3}
 --- !u!1 &538386555
 GameObject:
@@ -9084,6 +9161,7 @@ Transform:
   - {fileID: 696565701}
   - {fileID: 429791032}
   - {fileID: 566315839}
+  - {fileID: 1354153025}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!43 &708529776
@@ -11673,6 +11751,7 @@ GameObject:
   - component: {fileID: 843830112}
   - component: {fileID: 843830111}
   - component: {fileID: 843830121}
+  - component: {fileID: 843830122}
   m_Layer: 0
   m_Name: LugNutTray
   m_TagString: Untagged
@@ -12051,6 +12130,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TireTraining.FetchItemTag
   item: 5
+--- !u!114 &843830122
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 843830109}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ccb3edf8bdbb46cbbeaccab084ec7ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TireTraining.RoleGrabGate
+  startsAtCar: 0
 --- !u!1 &849494726
 GameObject:
   m_ObjectHideFlags: 0
@@ -15572,6 +15664,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 125260, guid: 812e3f763be51a143bb1d937f48c31f2, type: 3}
       insertIndex: -1
       addedObject: {fileID: 470626753}
+    - targetCorrespondingSourceObject: {fileID: 125260, guid: 812e3f763be51a143bb1d937f48c31f2, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 470626754}
   m_SourcePrefab: {fileID: 100100000, guid: 812e3f763be51a143bb1d937f48c31f2, type: 3}
 --- !u!1 &1073687832
 GameObject:
@@ -17915,6 +18010,57 @@ Transform:
   - {fileID: 1745826511}
   m_Father: {fileID: 517340078}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1295091037
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1295091038}
+  - component: {fileID: 1295091039}
+  m_Layer: 0
+  m_Name: AssemblerOnly
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1295091038
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1295091037}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1354153025}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1295091039
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1295091037}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 839c8acab2b2343c0aa77abd4037daf0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TireTraining.RoleGate
+  activeFor: 2
+  objects:
+  - {fileID: 34760679}
+  - {fileID: 724779625}
+  - {fileID: 998142485}
+  - {fileID: 151027398}
+  behaviours: []
 --- !u!1 &1307559036
 GameObject:
   m_ObjectHideFlags: 0
@@ -18458,6 +18604,39 @@ Transform:
   - {fileID: 1317589638}
   - {fileID: 1489660091}
   m_Father: {fileID: 865859949}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1354153024
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1354153025}
+  m_Layer: 0
+  m_Name: RoleGates
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1354153025
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1354153024}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 462184162}
+  - {fileID: 1295091038}
+  m_Father: {fileID: 706097757}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1361341762
 GameObject:
@@ -26599,6 +26778,7 @@ GameObject:
   - component: {fileID: 2026805066}
   - component: {fileID: 2026805065}
   - component: {fileID: 2026805068}
+  - component: {fileID: 2026805069}
   m_Layer: 0
   m_Name: Wheel
   m_TagString: Untagged
@@ -27046,6 +27226,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TireTraining.FetchItemTag
   item: 3
+--- !u!114 &2026805069
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2026805053}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ccb3edf8bdbb46cbbeaccab084ec7ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TireTraining.RoleGrabGate
+  startsAtCar: 1
 --- !u!4 &2028298835 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 475332, guid: 812e3f763be51a143bb1d937f48c31f2, type: 3}
@@ -28058,6 +28251,7 @@ GameObject:
   - component: {fileID: 7000000013}
   - component: {fileID: 7000000012}
   - component: {fileID: 7000000016}
+  - component: {fileID: 7000000017}
   m_Layer: 0
   m_Name: ScrewJack
   m_TagString: Untagged
@@ -28485,6 +28679,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TireTraining.FetchItemTag
   item: 2
+--- !u!114 &7000000017
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7000000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ccb3edf8bdbb46cbbeaccab084ec7ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TireTraining.RoleGrabGate
+  startsAtCar: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
