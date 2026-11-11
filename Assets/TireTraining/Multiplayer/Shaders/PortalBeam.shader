@@ -4,7 +4,7 @@
 // It is multiplied by a procedural value noise (two octaves) that scrolls upward over time.
 // The noise is sampled in 3D object space, so there is no UV seam around the cylinder. Because it is
 // object space, a scaled mesh scales the noise with it: raise _NoiseScale for a larger beam.
-// _BaseColor is HDR, so an intensity above 1 reaches Bloom.
+// _BaseColor alpha scales the beam's strength; the color is not tone-mapped or boosted.
 //
 // The height range is in object space. The defaults (-1 to 1) match Unity's built-in Cylinder.
 Shader "TireTraining/PortalBeam"

@@ -169,6 +169,7 @@ namespace TireTraining
 
             LocalRole = role;
             LocalRoleReady?.Invoke(role);
+            ScreenFader.FadeIn();
         }
 
         /// <summary>Moves the XR Origin to the spawn point's position and yaw; pitch and roll stay level.</summary>

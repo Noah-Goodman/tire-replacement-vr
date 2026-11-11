@@ -57,6 +57,7 @@ namespace TireTraining
 
         private async void Start()
         {
+            ScreenFader.FadeIn();
             ShowMessage(LobbyMessage);
             LobbyMessage = null;
 
@@ -239,6 +240,7 @@ namespace TireTraining
             IsLobbyReady = false;
             fetcherTaken = false;
             assemblerTaken = false;
+            ScreenFader.FadeIn();
             ShowMessage($"Could not join: {reason}");
             await RunLobbyLoop();
         }
