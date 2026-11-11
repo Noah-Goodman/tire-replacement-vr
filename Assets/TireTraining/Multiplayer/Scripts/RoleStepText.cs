@@ -66,23 +66,30 @@ namespace TireTraining
         public IReadOnlyList<Entry> Entries => entries;
 
         /// <summary>
-        /// Finds the entry whose chapter and step name both match exactly. Returns false, and logs a warning once per
-        /// missing pair, when there is none.
+        /// Finds the entry whose chapter and step name both match exactly. Returns false without a warning when the
+        /// step name is null or empty, which is the normal state before any step has started. Returns false, and
+        /// logs a warning once per missing pair, when a non-empty name has no entry.
         /// </summary>
         public bool TryGet(int chapter, string stepName, out Entry entry)
         {
+            if (string.IsNullOrEmpty(stepName))
+            {
+                entry = null;
+                return false;
+            }
+
             if (lookup == null)
             {
                 BuildLookup(false);
             }
 
-            if (stepName != null && lookup.TryGetValue((chapter, stepName), out entry))
+            if (lookup.TryGetValue((chapter, stepName), out entry))
             {
                 return true;
             }
 
             entry = null;
-            if (warned.Add((chapter, stepName ?? "")))
+            if (warned.Add((chapter, stepName)))
             {
                 Debug.LogWarning($"RoleStepText '{name}': no entry for chapter {chapter}, step '{stepName}'.", this);
             }
