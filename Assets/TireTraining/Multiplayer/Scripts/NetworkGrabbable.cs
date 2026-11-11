@@ -33,7 +33,7 @@ namespace TireTraining
         /// <summary>Number of hand-to-hand handoffs so far. Raises <see cref="HandoffRecorded"/> when it changes.</summary>
         [Networked, OnChangedRender(nameof(OnHandoffChanged))] public int HandoffCount { get; set; }
 
-        /// <summary>True once a storage zone has stored the item.</summary>
+        /// <summary>True while the item rests in a storage zone: a <see cref="StorageZone"/> sets it, and a hand grab clears it.</summary>
         [Networked] public NetworkBool Stored { get; set; }
 
         /// <summary>
@@ -283,9 +283,10 @@ namespace TireTraining
             }
         }
 
-        /// <summary>Makes <paramref name="local"/> the holder and records a handoff if the item came straight from the other role. State authority only.</summary>
+        /// <summary>Makes <paramref name="local"/> the holder, clears <see cref="Stored"/> and records a handoff if the item came straight from the other role. State authority only.</summary>
         private void TakeAsHolder(Role local)
         {
+            Stored = false;
             Role previous = Holder;
             if (IsOtherRole(previous, local))
             {

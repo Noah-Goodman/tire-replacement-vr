@@ -8,7 +8,8 @@ namespace TireTraining
     /// <summary>
     /// Marks an item as stored when the Fetcher puts it in this zone. Put it on a socket (an
     /// <see cref="XRSocketInteractor"/> or a subclass such as VR Builder's SnapZone). The zone acts only on the
-    /// Fetcher's device and leaves <see cref="NetworkGrabbable.Stored"/> set after the item leaves.
+    /// Fetcher's device and sets <see cref="NetworkGrabbable.Stored"/> while the socket holds the item; a hand grab on the
+    /// item clears it.
     /// </summary>
     public sealed class StorageZone : MonoBehaviour
     {

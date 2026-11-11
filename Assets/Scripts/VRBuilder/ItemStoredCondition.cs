@@ -12,7 +12,7 @@ namespace TireTraining
 {
     /// <summary>
     /// Completes while the item's <see cref="NetworkGrabbable.Stored"/> flag is set, which the Fetcher's
-    /// <see cref="StorageZone"/> does when the item is put on a storage spot.
+    /// <see cref="StorageZone"/> does when the item is put on a storage spot. A hand grab on the item clears the flag.
     /// </summary>
     [DataContract(IsReference = true)]
     public class ItemStoredCondition : Condition<ItemStoredCondition.EntityData>
