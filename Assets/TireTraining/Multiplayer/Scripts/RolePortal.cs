@@ -389,7 +389,7 @@ namespace TireTraining
             {
                 if (free)
                 {
-                    if (!particles.isPlaying)
+                    if (!particles.isEmitting)
                     {
                         particles.Play();
                     }
