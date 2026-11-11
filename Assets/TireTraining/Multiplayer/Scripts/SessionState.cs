@@ -67,10 +67,19 @@ namespace TireTraining
         private TickTimer resendTimer;
         private TickTimer warnTimer;
         private TickTimer confirmTimer;
+        private bool spawned;
+        private bool recoverySweepPending;
+        private readonly List<NetworkGrabbable> itemBuffer = new List<NetworkGrabbable>();
+        private readonly List<NetworkGrabbable> recoveringItems = new List<NetworkGrabbable>();
+
+        private bool CanRecoverItems => spawned && isActiveAndEnabled && Object != null && Object.IsValid
+            && Object.HasStateAuthority && Runner.IsSharedModeMasterClient;
 
         public override void Spawned()
         {
+            spawned = true;
             Instance = this;
+            recoverySweepPending = true;
 
             if (Object.HasStateAuthority)
             {
@@ -85,7 +94,30 @@ namespace TireTraining
 
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
+            spawned = false;
+            CancelItemRecoveries();
             StopReconciling();
+            if (Instance == this)
+            {
+                Instance = null;
+            }
+        }
+
+        private void OnEnable()
+        {
+            recoverySweepPending = true;
+        }
+
+        private void OnDisable()
+        {
+            CancelItemRecoveries();
+            recoverySweepPending = true;
+        }
+
+        private void OnDestroy()
+        {
+            spawned = false;
+            CancelItemRecoveries();
             if (Instance == this)
             {
                 Instance = null;
@@ -252,6 +284,9 @@ namespace TireTraining
                 return;
             }
 
+            // Capture the role and item identity while they still describe the departing connection.
+            QueueDepartingItems(player, GetRole(player));
+
             bool changed = false;
             if (Fetcher == player)
             {
@@ -273,8 +308,10 @@ namespace TireTraining
 
         public void StateAuthorityChanged()
         {
+            recoverySweepPending = true;
             if (!Object.HasStateAuthority)
             {
+                CancelItemRecoveries();
                 StopReconciling();
                 return;
             }
@@ -297,15 +334,7 @@ namespace TireTraining
 
         private bool IsActive(PlayerRef player)
         {
-            foreach (PlayerRef active in Runner.ActivePlayers)
-            {
-                if (active == player)
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return Runner.IsPlayerCommitted(player);
         }
 
         /// <summary>Clears any role whose holder is no longer in the session. State authority only.</summary>
@@ -313,13 +342,82 @@ namespace TireTraining
         {
             if (!Fetcher.IsNone && !IsActive(Fetcher))
             {
+                QueueDepartingItems(Fetcher, Role.Fetcher);
                 Fetcher = PlayerRef.None;
             }
 
             if (!Assembler.IsNone && !IsActive(Assembler))
             {
+                QueueDepartingItems(Assembler, Role.Assembler);
                 Assembler = PlayerRef.None;
             }
+        }
+
+        /// <summary>Queues a lifecycle rescan from an item, including one re-enabled after a departure.</summary>
+        internal bool TryQueueItemRecovery(NetworkGrabbable item)
+        {
+            if (!CanRecoverItems)
+            {
+                return false;
+            }
+
+            QueueItemRecovery(item, PlayerRef.None, Role.None);
+            return true;
+        }
+
+        private void QueueItemRecovery(NetworkGrabbable item, PlayerRef player, Role role)
+        {
+            if (item != null && item.IsSpawned && item.Runner == Runner
+                && item.BeginDepartureRecovery(player, role) && !recoveringItems.Contains(item))
+            {
+                recoveringItems.Add(item);
+            }
+        }
+
+        private void QueueDepartingItems(PlayerRef player, Role role)
+        {
+            // The role capture is useful even if master status has not caught up with state authority yet.
+            itemBuffer.Clear();
+            Runner.GetAllBehaviours(itemBuffer);
+            for (int i = 0; i < itemBuffer.Count; i++)
+            {
+                QueueItemRecovery(itemBuffer[i], player, role);
+            }
+
+            itemBuffer.Clear();
+        }
+
+        private void SweepDepartedItems()
+        {
+            // HolderPlayer/actor survive role clearing and automatic item authority transfer.
+            QueueDepartingItems(PlayerRef.None, Role.None);
+        }
+
+        private void RecoverDepartedItems()
+        {
+            for (int i = recoveringItems.Count - 1; i >= 0; i--)
+            {
+                NetworkGrabbable item = recoveringItems[i];
+                if (item == null || !item.ContinueDepartureRecovery())
+                {
+                    recoveringItems.RemoveAt(i);
+                }
+            }
+        }
+
+        private void CancelItemRecoveries()
+        {
+            for (int i = 0; i < recoveringItems.Count; i++)
+            {
+                NetworkGrabbable item = recoveringItems[i];
+                if (item != null)
+                {
+                    item.CancelDepartureRecovery();
+                }
+            }
+
+            recoveringItems.Clear();
+            itemBuffer.Clear();
         }
 
         /// <summary>Starts reconciling the session properties with the roles and runs the first check now. State authority only.</summary>
@@ -335,6 +433,19 @@ namespace TireTraining
         /// </summary>
         public override void FixedUpdateNetwork()
         {
+            if (CanRecoverItems)
+            {
+                if (recoverySweepPending)
+                {
+                    recoverySweepPending = false;
+                    SweepGonePlayers();
+                    SweepDepartedItems();
+                    PublishSessionProperties();
+                }
+
+                RecoverDepartedItems();
+            }
+
             if (reconciling)
             {
                 Reconcile();

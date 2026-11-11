@@ -10,8 +10,8 @@ namespace TireTraining
     /// Fetcher board text, in priority order: "Training complete." when the process is finished; "Waiting for the
     /// Assembler" when no Assembler is in the session or the step has no entry; otherwise the entry's Fetcher text.
     ///
-    /// Assembler line text, in priority order: on a step with a handoff in either direction (Handoff is not
-    /// <see cref="HandoffDirection.None"/>), "Waiting for the Fetcher to join" when no Fetcher is in the session; then,
+    /// Assembler line text, in priority order: on a handoff or Fetcher storage step
+    /// (<see cref="RoleStepText.Entry.RequiresFetcher"/>), "Waiting for the Fetcher to join" when no Fetcher is in the session; then,
     /// on a <see cref="HandoffDirection.FetcherToAssembler"/> step with an item, "Take the {item} from the Fetcher"
     /// while the Fetcher holds the item and it is within <see cref="takeDistance"/> of the main camera; otherwise the
     /// entry's Assembler text. The Fetcher check comes first because a Fetcher who has left can't hand anything over,
@@ -166,7 +166,7 @@ namespace TireTraining
                 return null;
             }
 
-            if (entry.Handoff != HandoffDirection.None && !bound.GetPlayer(Role.Fetcher).IsRealPlayer)
+            if (entry.RequiresFetcher && !bound.GetPlayer(Role.Fetcher).IsRealPlayer)
             {
                 return "Waiting for the Fetcher to join";
             }

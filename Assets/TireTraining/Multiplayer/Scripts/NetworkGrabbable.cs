@@ -24,6 +24,15 @@ namespace TireTraining
         /// <summary>Role of the player holding the item with a hand; <see cref="Role.None"/> when nobody does.</summary>
         [Networked] public Role Holder { get; set; }
 
+        /// <summary>Player whose hand set <see cref="Holder"/>; empty when nobody holds the item.</summary>
+        [Networked] public PlayerRef HolderPlayer { get; set; }
+
+        /// <summary>Room actor ID of the holding connection. Unlike PlayerRefs, actor IDs are not reused within a room.</summary>
+        [Networked] public int HolderActorId { get; set; }
+
+        /// <summary>Changes on each hand acquisition or release, independently of the handoff history.</summary>
+        [Networked] public int HolderRevision { get; set; }
+
         /// <summary>Role that gave the item in the last hand-to-hand handoff.</summary>
         [Networked] public Role LastHandoffFrom { get; set; }
 
@@ -65,6 +74,18 @@ namespace TireTraining
         private bool layersDropped;
         private bool pendingRequest;
 
+        private const float RecoveryIntervalSeconds = 0.5f;
+        private const float RecoveryTimeoutSeconds = 10f;
+        private bool recoveryScanPending;
+        private bool recoveryPending;
+        private PlayerRef recoveryPlayer;
+        private PlayerRef recoveryHolderPlayer;
+        private int recoveryActorId;
+        private int recoveryRevision;
+        private Role recoveryRole;
+        private TickTimer recoveryDeadline;
+        private TickTimer recoveryRetry;
+
         private bool HasState => spawned && Object != null && Object.IsValid;
 
         /// <summary>
@@ -77,6 +98,8 @@ namespace TireTraining
             spawned = true;
             TryBind();
             ApplyLocalRules();
+            recoveryScanPending = true;
+            RequestRecoveryScan();
             HandoffRecorded?.Invoke(LastHandoffFrom, LastHandoffTo, HandoffCount);
         }
 
@@ -85,10 +108,32 @@ namespace TireTraining
             Unbind(true);
             spawned = false;
             pendingRequest = false;
+            recoveryScanPending = false;
+            CancelDepartureRecovery();
+        }
+
+        private void OnEnable()
+        {
+            // OnEnable also runs before Spawned, when the networked properties cannot be read.
+            recoveryScanPending = true;
+            if (HasState)
+            {
+                RequestRecoveryScan();
+            }
+        }
+
+        private void OnDisable()
+        {
+            pendingRequest = false;
+            recoveryScanPending = true;
+            CancelDepartureRecovery();
         }
 
         private void OnDestroy()
         {
+            spawned = false;
+            pendingRequest = false;
+            CancelDepartureRecovery();
             Unbind(true);
         }
 
@@ -97,6 +142,11 @@ namespace TireTraining
             if (spawned && bound == null)
             {
                 TryBind();
+            }
+
+            if (HasState && recoveryScanPending)
+            {
+                RequestRecoveryScan();
             }
         }
 
@@ -118,6 +168,13 @@ namespace TireTraining
             {
                 return;
             }
+
+            if (found == bound)
+            {
+                return;
+            }
+
+            Unbind(true);
 
             bound = found;
             body = found.GetComponent<Rigidbody>();
@@ -242,7 +299,13 @@ namespace TireTraining
 
         private void OnSelectEntered(SelectEnterEventArgs args)
         {
-            if (!HasState || !IsHand(args.interactorObject))
+            if (!HasState || !isActiveAndEnabled)
+            {
+                return;
+            }
+
+            CancelDepartureRecovery();
+            if (!IsHand(args.interactorObject))
             {
                 return;
             }
@@ -254,7 +317,7 @@ namespace TireTraining
             }
 
             Role holder = Holder;
-            if (IsOtherRole(holder, local))
+            if (IsOtherRole(holder, local) && HasLiveHolder())
             {
                 TakenFromOtherPlayer?.Invoke(holder, local);
             }
@@ -272,14 +335,14 @@ namespace TireTraining
 
         private void OnSelectExited(SelectExitEventArgs args)
         {
-            if (!HasState || !IsHand(args.interactorObject))
+            if (!HasState || !isActiveAndEnabled || !IsHand(args.interactorObject))
             {
                 return;
             }
 
             if (Object.HasStateAuthority && !IsHeldByLocalHand() && RoleBootstrap.LocalRole != Role.None)
             {
-                Holder = Role.None;
+                ClearHolder();
             }
         }
 
@@ -288,7 +351,7 @@ namespace TireTraining
         {
             Stored = false;
             Role previous = Holder;
-            if (IsOtherRole(previous, local))
+            if (IsOtherRole(previous, local) && HasLiveHolder())
             {
                 LastHandoffFrom = previous;
                 LastHandoffTo = local;
@@ -296,31 +359,53 @@ namespace TireTraining
             }
 
             Holder = local;
+            HolderPlayer = Runner.LocalPlayer;
+            HolderActorId = Runner.GetPlayerActorId(Runner.LocalPlayer).GetValueOrDefault();
+            HolderRevision++;
+            CancelDepartureRecovery();
+        }
+
+        private void ClearHolder()
+        {
+            Holder = Role.None;
+            HolderPlayer = PlayerRef.None;
+            HolderActorId = 0;
+            HolderRevision++;
+        }
+
+        private bool HasLiveHolder()
+        {
+            return !HolderPlayer.IsNone && Runner.IsPlayerCommitted(HolderPlayer)
+                && (HolderActorId == 0 || Runner.GetPlayerActorId(HolderPlayer) == HolderActorId);
         }
 
         public void StateAuthorityChanged()
         {
-            if (!HasState)
+            if (!HasState || !isActiveAndEnabled)
             {
                 return;
             }
 
             Role local = RoleBootstrap.LocalRole;
 
+            recoveryScanPending = true;
+            RequestRecoveryScan();
+
             if (Object.HasStateAuthority)
             {
                 bool wasRequested = pendingRequest;
                 pendingRequest = false;
+                ContinueDepartureRecovery();
                 if (local != Role.None)
                 {
                     if (IsHeldByLocalHand())
                     {
                         TakeAsHolder(local);
                     }
-                    else if (wasRequested && Holder != Role.None)
+                    else if (wasRequested && !recoveryPending && Holder != Role.None)
                     {
                         // The grab ended before authority arrived; the previous holder's grab was cancelled.
-                        Holder = Role.None;
+                        ClearHolder();
                     }
                 }
             }
@@ -334,6 +419,174 @@ namespace TireTraining
             }
 
             ApplyLocalRules();
+        }
+
+        private void RequestRecoveryScan()
+        {
+            SessionState state = SessionState.Instance;
+            if (state != null && state.TryQueueItemRecovery(this))
+            {
+                recoveryScanPending = false;
+            }
+        }
+
+        /// <summary>Captures the held connection before SessionState clears its role; no network writes occur here.</summary>
+        internal bool BeginDepartureRecovery(PlayerRef leavingPlayer, Role leavingRole)
+        {
+            if (!HasState || !isActiveAndEnabled || Stored || Holder == Role.None)
+            {
+                return false;
+            }
+
+            PlayerRef player = HolderPlayer;
+            if (player.IsNone && Holder == leavingRole)
+            {
+                player = leavingPlayer;
+            }
+
+            if (player.IsNone || (!leavingPlayer.IsNone && player != leavingPlayer))
+            {
+                return false;
+            }
+
+            if (bound != null && bound.isSelected)
+            {
+                return false;
+            }
+
+            // A positive actor ID distinguishes a departed connection from a reused PlayerRef.
+            // Missing actor information with a committed player is inconclusive, never a reason to drop it.
+            if (leavingPlayer.IsNone && Runner.IsPlayerCommitted(player))
+            {
+                int? actor = Runner.GetPlayerActorId(player);
+                if (HolderActorId == 0 || (actor.HasValue && actor.Value == HolderActorId))
+                {
+                    return false;
+                }
+            }
+
+            if (recoveryPending && recoveryRevision == HolderRevision && recoveryHolderPlayer == HolderPlayer
+                && recoveryActorId == HolderActorId && recoveryRole == Holder)
+            {
+                return true;
+            }
+
+            recoveryPending = true;
+            recoveryPlayer = player;
+            recoveryHolderPlayer = HolderPlayer;
+            recoveryActorId = HolderActorId;
+            recoveryRevision = HolderRevision;
+            recoveryRole = Holder;
+            recoveryDeadline = TickTimer.CreateFromSeconds(Runner, RecoveryTimeoutSeconds);
+            recoveryRetry = default;
+            return true;
+        }
+
+        /// <summary>Called only for queued items by the master; true means an asynchronous recovery is still pending.</summary>
+        internal bool ContinueDepartureRecovery()
+        {
+            if (!recoveryPending)
+            {
+                return false;
+            }
+
+            if (!HasState || !isActiveAndEnabled || !Runner.IsSharedModeMasterClient || Stored
+                || Holder != recoveryRole || HolderPlayer != recoveryHolderPlayer
+                || HolderActorId != recoveryActorId || HolderRevision != recoveryRevision
+                || (bound != null && bound.isSelected))
+            {
+                CancelDepartureRecovery();
+                return false;
+            }
+
+            if (recoveryDeadline.Expired(Runner))
+            {
+                Debug.LogWarning($"NetworkGrabbable '{name}': departed-holder recovery timed out without changing the item.", this);
+                CancelDepartureRecovery();
+                return false;
+            }
+
+            if (Runner.IsPlayerCommitted(recoveryPlayer))
+            {
+                int? actor = Runner.GetPlayerActorId(recoveryPlayer);
+                if (!actor.HasValue)
+                {
+                    return true;
+                }
+
+                if (recoveryActorId == 0 || actor.Value == recoveryActorId)
+                {
+                    // PlayerLeft may precede the committed-player update. Wait rather than assuming its order.
+                    return true;
+                }
+            }
+
+            if (bound == null)
+            {
+                TryBind();
+                if (bound == null || bound.isSelected)
+                {
+                    return true;
+                }
+            }
+
+            if (body == null)
+            {
+                body = bound.GetComponent<Rigidbody>();
+                if (body == null)
+                {
+                    return true;
+                }
+
+                bodyDefaultKinematic = body.isKinematic;
+            }
+
+            if (!Object.HasStateAuthority)
+            {
+                PlayerRef authority = Object.StateAuthority;
+                if (!authority.IsNone && Runner.IsPlayerCommitted(authority))
+                {
+                    if (authority == Runner.LocalPlayer)
+                    {
+                        return true;
+                    }
+
+                    // A live player has taken authority, possibly before its holder snapshot has arrived.
+                    CancelDepartureRecovery();
+                    return false;
+                }
+
+                if (recoveryRetry.ExpiredOrNotRunning(Runner))
+                {
+                    recoveryRetry = TickTimer.CreateFromSeconds(Runner, RecoveryIntervalSeconds);
+                    Object.RequestStateAuthority();
+                }
+
+                return true;
+            }
+
+            ClearHolder();
+            pendingRequest = false;
+            CancelDepartureRecovery();
+            // This explicit drop does not replace the Rigidbody defaults cached before proxy forcing.
+            body.useGravity = true;
+            body.isKinematic = false;
+            kinematicForced = false;
+
+            ApplyLocalRules();
+            return false;
+        }
+
+        internal void CancelDepartureRecovery()
+        {
+            recoveryPending = false;
+            recoveryPlayer = PlayerRef.None;
+            recoveryHolderPlayer = PlayerRef.None;
+            recoveryRole = Role.None;
+            recoveryActorId = 0;
+            recoveryRevision = 0;
+            recoveryDeadline = default;
+            recoveryRetry = default;
         }
 
         private void CancelLocalGrab(Role local)
@@ -370,6 +623,10 @@ namespace TireTraining
             }
 
             Stored = stored;
+            if (stored)
+            {
+                CancelDepartureRecovery();
+            }
         }
     }
 }

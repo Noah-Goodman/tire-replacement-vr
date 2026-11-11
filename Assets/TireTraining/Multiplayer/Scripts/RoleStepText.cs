@@ -55,6 +55,11 @@ namespace TireTraining
 
             /// <summary>Which way the item changes hands in this step.</summary>
             public HandoffDirection Handoff => handoff;
+
+            /// <summary>Whether the step waits for a handoff or one of the Fetcher's two storage actions.</summary>
+            public bool RequiresFetcher => handoff != HandoffDirection.None
+                || (chapter == 2 && stepName == "Store the old wheel on the garage tire rack")
+                || (chapter == 4 && stepName == "End Ch5");
         }
 
         [SerializeField] private List<Entry> entries = new List<Entry>();
