@@ -4,6 +4,14 @@ using UnityEngine;
 
 namespace TireTraining
 {
+    /// <summary>Which way an item changes hands during a step.</summary>
+    public enum HandoffDirection
+    {
+        None,
+        FetcherToAssembler,
+        AssemblerToFetcher
+    }
+
     /// <summary>
     /// Maps a process step, identified by chapter index and step name, to the text each role sees and the item
     /// the Fetcher works with in that step. Step names repeat across chapters, so the chapter index is part of the key.
@@ -27,6 +35,9 @@ namespace TireTraining
             [Tooltip("The item the Fetcher works with in this step.")]
             [SerializeField] private FetchItem item;
 
+            [Tooltip("Which way the item changes hands in this step.")]
+            [SerializeField] private HandoffDirection handoff;
+
             /// <summary>0-based chapter index of the step.</summary>
             public int Chapter => chapter;
 
@@ -41,6 +52,9 @@ namespace TireTraining
 
             /// <summary>The item the Fetcher works with in this step.</summary>
             public FetchItem Item => item;
+
+            /// <summary>Which way the item changes hands in this step.</summary>
+            public HandoffDirection Handoff => handoff;
         }
 
         [SerializeField] private List<Entry> entries = new List<Entry>();

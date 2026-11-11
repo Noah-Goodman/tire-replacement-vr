@@ -42,6 +42,9 @@ namespace TireTraining
         [Tooltip("The asset that maps steps to role texts and items.")]
         [SerializeField] private RoleStepText stepText;
 
+        /// <summary>The step text table this state uses; may be null when none is assigned.</summary>
+        public RoleStepText StepText => stepText;
+
         /// <summary>The item the Fetcher works with in the current step, looked up in the step text asset.</summary>
         [Networked, OnChangedRender(nameof(OnProgressChanged))] public FetchItem Needed { get; set; }
 
