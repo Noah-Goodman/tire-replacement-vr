@@ -9,7 +9,7 @@ namespace TireTraining
 {
     /// <summary>
     /// Carried by every shared grabbable item. Moves state authority to the player who grabs the item, records who
-    /// holds it and every hand-to-hand handoff, keeps the Rigidbody kinematic on devices without state authority,
+    /// holds it and every receiving grab after the other role carried it, keeps the Rigidbody kinematic on devices without state authority,
     /// and hides the item from local snap zones while the other player holds it.
     /// Needs <b>Allow State Authority Override</b> on the NetworkObject. When the object is not spawned (no session),
     /// it only keeps the Rigidbody interpolation rule for local hand holds.
@@ -33,21 +33,25 @@ namespace TireTraining
         /// <summary>Changes on each hand acquisition or release, independently of the handoff history.</summary>
         [Networked] public int HolderRevision { get; set; }
 
-        /// <summary>Role that gave the item in the last hand-to-hand handoff.</summary>
+        /// <summary>Role of the most recent completed hand acquisition; retained through release, storage and departure.</summary>
+        [Networked] public Role LastHeldBy { get; set; }
+
+        /// <summary>Role that last carried the item before the receiving role grabbed it.</summary>
         [Networked] public Role LastHandoffFrom { get; set; }
 
-        /// <summary>Role that took the item in the last hand-to-hand handoff.</summary>
+        /// <summary>Role that took the item in the last direct or pickup handoff.</summary>
         [Networked] public Role LastHandoffTo { get; set; }
 
-        /// <summary>Number of hand-to-hand handoffs so far. Raises <see cref="HandoffRecorded"/> when it changes.</summary>
+        /// <summary>Number of direct or pickup handoffs so far. Raises <see cref="HandoffRecorded"/> when it changes.</summary>
         [Networked, OnChangedRender(nameof(OnHandoffChanged))] public int HandoffCount { get; set; }
 
         /// <summary>True while the item rests in a storage zone: a <see cref="StorageZone"/> sets it, and a hand grab clears it.</summary>
         [Networked] public NetworkBool Stored { get; set; }
 
         /// <summary>
-        /// Raised on the taking device at the moment of a local hand grab while <see cref="Holder"/> is the other role.
-        /// Arguments: (from = the holder's role, to = the local role). Does not wait for the network.
+        /// Raised on the taking device at a local hand grab when <see cref="LastHeldBy"/> is the other role,
+        /// including a pickup after release or departure. Arguments: (from = the last carrying role, to = the local role).
+        /// Does not wait for the authoritative hand acquisition or network record.
         /// </summary>
         public event Action<Role, Role> TakenFromOtherPlayer;
 
@@ -407,10 +411,10 @@ namespace TireTraining
                 return;
             }
 
-            Role holder = Holder;
-            if (IsOtherRole(holder, local) && HasLiveHolder())
+            Role previous = LastHeldBy;
+            if (IsOtherRole(previous, local))
             {
-                TakenFromOtherPlayer?.Invoke(holder, local);
+                TakenFromOtherPlayer?.Invoke(previous, local);
             }
 
             if (Object.HasStateAuthority)
@@ -437,18 +441,19 @@ namespace TireTraining
             }
         }
 
-        /// <summary>Makes <paramref name="local"/> the holder, clears <see cref="Stored"/> and records a handoff if the item came straight from the other role. State authority only.</summary>
+        /// <summary>Makes <paramref name="local"/> the holder, clears <see cref="Stored"/> and records a handoff if the other role last carried it. State authority only.</summary>
         private void TakeAsHolder(Role local)
         {
             Stored = false;
-            Role previous = Holder;
-            if (IsOtherRole(previous, local) && HasLiveHolder())
+            Role previous = LastHeldBy;
+            if (IsOtherRole(previous, local))
             {
                 LastHandoffFrom = previous;
                 LastHandoffTo = local;
                 HandoffCount++;
             }
 
+            LastHeldBy = local;
             Holder = local;
             HolderPlayer = Runner.LocalPlayer;
             HolderActorId = Runner.GetPlayerActorId(Runner.LocalPlayer).GetValueOrDefault();
@@ -462,12 +467,6 @@ namespace TireTraining
             HolderPlayer = PlayerRef.None;
             HolderActorId = 0;
             HolderRevision++;
-        }
-
-        private bool HasLiveHolder()
-        {
-            return !HolderPlayer.IsNone && Runner.IsPlayerCommitted(HolderPlayer)
-                && (HolderActorId == 0 || Runner.GetPlayerActorId(HolderPlayer) == HolderActorId);
         }
 
         public void StateAuthorityChanged()

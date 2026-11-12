@@ -17,13 +17,14 @@ namespace TireTraining
     /// an item other than <see cref="FetchItem.None"/>:
     ///  - Pulse, on the Fetcher's device: while the item is spawned and nobody holds it, its highlight pulses in the
     ///    Fetcher color at <see cref="pulseHz"/>.
-    ///  - Take cue, on the Assembler's device: while the Fetcher is in the session, the Fetcher holds the item and it
-    ///    is within <see cref="takeDistance"/> of the main camera, the item is highlighted steadily in the Assembler
-    ///    color. A Fetcher who has left can leave the item's holder reading Fetcher, so the Fetcher's presence is checked first.
+    ///  - Take cue, on the Assembler's device: within <see cref="takeDistance"/> of the main camera, an item held by a
+    ///    present Fetcher or unheld and last carried by the Fetcher is highlighted steadily in the Assembler color.
+    ///    A departed Fetcher's stale holder value must clear before the item is treated as a pickup.
     /// Neither cue shows once the process is finished.
     ///
     /// Haptics, on both devices, for every tagged item: when the local hand takes the item from the other role the
-    /// hand now holding it buzzes, and when the local hand's grab is cancelled by a handoff the hand that held it buzzes.
+    /// hand now holding it buzzes. A new recorded handoff from the local role buzzes the hand that last held it,
+    /// including when the item was dropped before the receiving grab. Spawn records establish a silent baseline.
     ///
     /// Highlights go through the item's <see cref="InteractableHighlighter"/> when it has one, otherwise its
     /// <see cref="DefaultHighlighter"/>: the same choice VR Builder's highlight property makes, so all highlights of
@@ -45,7 +46,7 @@ namespace TireTraining
             Take
         }
 
-        [Tooltip("Metres from the main camera within which the Fetcher's held item is highlighted for the Assembler.")]
+        [Tooltip("Metres from the main camera within which an item carried by the Fetcher is highlighted for the Assembler to take or pick up.")]
         [SerializeField] private float takeDistance = 1.5f;
 
         [Tooltip("Pulses per second of the Fetcher's highlight.")]
@@ -77,13 +78,20 @@ namespace TireTraining
             public XRBaseInputInteractor LastHand;
             public Cue ActiveCue;
             public HandoffCues Owner;
+            private bool hasHandoffBaseline;
+            private int lastHandoffCount;
 
             public void Bind()
             {
                 if (Grabbable != null)
                 {
                     Grabbable.TakenFromOtherPlayer += OnTaken;
-                    Grabbable.GrabCancelledByHandoff += OnCancelled;
+                    Grabbable.HandoffRecorded += OnHandoffRecorded;
+                    hasHandoffBaseline = Grabbable.IsSpawned;
+                    if (hasHandoffBaseline)
+                    {
+                        lastHandoffCount = Grabbable.HandoffCount;
+                    }
                 }
 
                 if (Interactable != null)
@@ -97,7 +105,7 @@ namespace TireTraining
                 if (Grabbable != null)
                 {
                     Grabbable.TakenFromOtherPlayer -= OnTaken;
-                    Grabbable.GrabCancelledByHandoff -= OnCancelled;
+                    Grabbable.HandoffRecorded -= OnHandoffRecorded;
                 }
 
                 if (Interactable != null)
@@ -132,9 +140,25 @@ namespace TireTraining
                 Owner.Buzz(hand != null ? hand : LastHand);
             }
 
-            private void OnCancelled(Role from, Role to)
+            private void OnHandoffRecorded(Role from, Role to, int count)
             {
-                Owner.Buzz(LastHand);
+                if (!hasHandoffBaseline)
+                {
+                    hasHandoffBaseline = true;
+                    lastHandoffCount = count;
+                    return;
+                }
+
+                if (count <= lastHandoffCount)
+                {
+                    return;
+                }
+
+                lastHandoffCount = count;
+                if (from == RoleBootstrap.LocalRole)
+                {
+                    Owner.Buzz(LastHand);
+                }
             }
         }
 
@@ -266,7 +290,9 @@ namespace TireTraining
                 return grabbable.Holder == Role.None ? Cue.Pulse : Cue.None;
             }
 
-            if (local == Role.Assembler && state.GetPlayer(Role.Fetcher).IsRealPlayer && grabbable.Holder == Role.Fetcher)
+            bool canTake = grabbable.Holder == Role.None && grabbable.LastHeldBy == Role.Fetcher ||
+                grabbable.Holder == Role.Fetcher && state.GetPlayer(Role.Fetcher).IsRealPlayer;
+            if (local == Role.Assembler && canTake)
             {
                 Camera cam = Camera.main;
                 if (cam != null && (binding.Tag.transform.position - cam.transform.position).sqrMagnitude <= takeDistance * takeDistance)

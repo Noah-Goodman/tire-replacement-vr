@@ -12,7 +12,8 @@ namespace TireTraining
     /// pass, so storage sockets, car snap zones and the nut tray keep working for either role.
     /// Rules, per local role (everything is allowed with no network session or no role yet):
     /// the Fetcher may grab the item while it is <see cref="SessionState.Needed"/> or while the Fetcher already holds it;
-    /// the Assembler may grab it while the Fetcher or the Assembler holds it, or when it is at the car, meaning its last
+    /// the Assembler may grab it while the Fetcher or the Assembler holds it, after the Fetcher sets it down,
+    /// or when it is at the car, meaning its last
     /// recorded handoff went to the Assembler or, with no handoff yet, <see cref="startsAtCar"/>.
     /// An item that isn't spawned yet can't be grabbed by either role.
     /// The filter is re-checked every frame for an existing grab, so a grab that stops being allowed is dropped.
@@ -121,6 +122,11 @@ namespace TireTraining
             }
 
             if (grabbable.Holder == Role.Fetcher || grabbable.Holder == Role.Assembler)
+            {
+                return true;
+            }
+
+            if (grabbable.Holder == Role.None && grabbable.LastHeldBy == Role.Fetcher)
             {
                 return true;
             }

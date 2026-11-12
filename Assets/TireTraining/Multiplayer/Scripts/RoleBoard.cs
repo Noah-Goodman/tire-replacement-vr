@@ -10,12 +10,11 @@ namespace TireTraining
     /// Fetcher board text, in priority order: "Training complete." when the process is finished; "Waiting for the
     /// Assembler" when no Assembler is in the session or the step has no entry; otherwise the entry's Fetcher text.
     ///
-    /// Assembler line text, in priority order: on a handoff or Fetcher storage step
-    /// (<see cref="RoleStepText.Entry.RequiresFetcher"/>), "Waiting for the Fetcher to join" when no Fetcher is in the session; then,
-    /// on a <see cref="HandoffDirection.FetcherToAssembler"/> step with an item, "Take the {item} from the Fetcher"
-    /// while the Fetcher holds the item and it is within <see cref="takeDistance"/> of the main camera; otherwise the
-    /// entry's Assembler text. The Fetcher check comes first because a Fetcher who has left can't hand anything over,
-    /// although the item's holder may still read Fetcher.
+    /// Assembler line text: on an active delivery step, an item within <see cref="takeDistance"/> shows
+    /// "Pick up the {item}" if unheld and last carried by the Fetcher, or "Take the {item} from the Fetcher" if held
+    /// by a present Fetcher. Otherwise, steps with <see cref="RoleStepText.Entry.RequiresFetcher"/> show
+    /// "Waiting for the Fetcher to join" when the Fetcher is absent; all other cases use the entry's Assembler text.
+    /// A departed Fetcher's stale holder value must clear before the item is treated as a pickup.
     ///
     /// The board follows <see cref="SessionState.Instance"/>, binding to it whenever it changes, so it works when the
     /// state spawns after the board or despawns. It also refreshes when <see cref="RoleBootstrap.LocalRoleReady"/>
@@ -38,7 +37,7 @@ namespace TireTraining
         [Tooltip("What is hidden when the board has nothing to show. When empty: this GameObject's first child if it has one, otherwise the text's GameObject.")]
         [SerializeField] private GameObject root;
 
-        [Tooltip("Metres from the main camera within which the Fetcher's held item counts as close enough to take.")]
+        [Tooltip("Metres from the main camera within which an item carried by the Fetcher counts as close enough to take or pick up.")]
         [SerializeField] private float takeDistance = 1.5f;
 
         private SessionState bound;
@@ -166,18 +165,19 @@ namespace TireTraining
                 return null;
             }
 
+            if (!bound.Finished && entry.Handoff == HandoffDirection.FetcherToAssembler && entry.Item != FetchItem.None)
+            {
+                takeCanApply = true;
+                string pickupMessage = ItemInReachMessage(entry.Item);
+                if (pickupMessage != null)
+                {
+                    return pickupMessage;
+                }
+            }
+
             if (entry.RequiresFetcher && !bound.GetPlayer(Role.Fetcher).IsRealPlayer)
             {
                 return "Waiting for the Fetcher to join";
-            }
-
-            if (entry.Handoff == HandoffDirection.FetcherToAssembler && entry.Item != FetchItem.None)
-            {
-                takeCanApply = true;
-                if (IsItemInReach(entry.Item))
-                {
-                    return $"Take the {entry.Item.GetDisplayName()} from the Fetcher";
-                }
             }
 
             return entry.AssemblerText;
@@ -194,21 +194,29 @@ namespace TireTraining
             return entry;
         }
 
-        private bool IsItemInReach(FetchItem item)
+        private string ItemInReachMessage(FetchItem item)
         {
             if (!FetchItemTag.TryGet(item, out FetchItemTag tag))
             {
-                return false;
+                return null;
             }
 
             NetworkGrabbable grabbable = tag.Grabbable;
             Camera cam = Camera.main;
-            if (grabbable == null || !grabbable.IsSpawned || cam == null || grabbable.Holder != Role.Fetcher)
+            if (grabbable == null || !grabbable.IsSpawned || cam == null ||
+                (tag.transform.position - cam.transform.position).sqrMagnitude > takeDistance * takeDistance)
             {
-                return false;
+                return null;
             }
 
-            return (tag.transform.position - cam.transform.position).sqrMagnitude <= takeDistance * takeDistance;
+            if (grabbable.Holder == Role.None && grabbable.LastHeldBy == Role.Fetcher)
+            {
+                return $"Pick up the {item.GetDisplayName()}";
+            }
+
+            return grabbable.Holder == Role.Fetcher && bound.GetPlayer(Role.Fetcher).IsRealPlayer
+                ? $"Take the {item.GetDisplayName()} from the Fetcher"
+                : null;
         }
     }
 }

@@ -14,8 +14,8 @@ using VRBuilder.Core.SceneObjects;
 namespace TireTraining
 {
     /// <summary>
-    /// Completes when the item changes hands from the giving role to the receiving role after the step started.
-    /// Putting the item down and picking it up again does not count.
+    /// Completes when the receiving role grabs the item after the step starts and the giving role last carried it.
+    /// Direct takes and pickups after release or departure count; earlier handoff records only establish the baseline.
     /// </summary>
     [DataContract(IsReference = true)]
     public class HandoffCondition : Condition<HandoffCondition.EntityData>
@@ -25,7 +25,7 @@ namespace TireTraining
         {
             [DataMember]
             [DisplayName("Item")]
-            [DisplayTooltip("The item that is handed from one player to the other.")]
+            [DisplayTooltip("The item the receiving role grabs after the giving role carried it, directly or after it was set down.")]
             public SingleScenePropertyReference<IGrabbableProperty> Item { get; set; }
 
             [DataMember]
