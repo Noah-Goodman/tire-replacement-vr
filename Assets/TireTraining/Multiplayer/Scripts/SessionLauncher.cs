@@ -43,6 +43,9 @@ namespace TireTraining
         private bool lobbyLoopRunning;
         private int attemptGeneration;
 
+        // The LobbyMessage this lobby opened with; it stays on screen until a role is accepted.
+        private string returnMessage;
+
         internal static int JoinFadeToken { get; private set; }
 
         internal static void ReleaseJoinFade(int token)
@@ -76,7 +79,8 @@ namespace TireTraining
         {
             ScreenFader.FadeIn();
             JoinFadeToken = 0;
-            ShowMessage(LobbyMessage);
+            returnMessage = LobbyMessage;
+            ShowMessage(returnMessage);
             LobbyMessage = null;
 
             try
@@ -137,7 +141,7 @@ namespace TireTraining
                         if (result.Ok)
                         {
                             IsLobbyReady = true;
-                            ShowMessage(null);
+                            ShowMessage(returnMessage);
                             return;
                         }
 
@@ -194,6 +198,7 @@ namespace TireTraining
 
             IsJoining = true;
             ChosenRole = role;
+            returnMessage = null;
             JoinFadeToken = fadeToken == 0 ? ScreenFader.CurrentFadeToken : fadeToken;
             int generation = ++attemptGeneration;
             _ = JoinRoutine(runner, generation, JoinFadeToken);
@@ -334,6 +339,7 @@ namespace TireTraining
             NetworkRunner runner = go.AddComponent<NetworkRunner>();
             runner.ProvideInput = false;
             runner.AddCallbacks(this);
+            go.AddComponent<SessionConnectionRecovery>().Init(runner);
             return runner;
         }
 
@@ -346,7 +352,10 @@ namespace TireTraining
 
             try
             {
-                await runner.Shutdown(true);
+                if (!runner.IsShutdown)
+                {
+                    await runner.Shutdown(true);
+                }
             }
             catch (Exception e)
             {
