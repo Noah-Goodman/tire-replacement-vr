@@ -5769,6 +5769,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TireTraining.NetworkGrabbable
   interactable: {fileID: 0}
   _Holder: 0
+  _HolderActorId: 0
+  _HolderRevision: 0
   _LastHandoffFrom: 0
   _LastHandoffTo: 0
   _HandoffCount: 0
@@ -5790,7 +5792,7 @@ MonoBehaviour:
   SyncScale: 0
   SyncParent: 0
   _autoAOIOverride: 1
-  ConfigFlags: 0
+  ConfigFlags: 1
   PhysicsSettings:
     ForecastEnabled: 0
     DebugPhysics: 0
@@ -6679,6 +6681,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TireTraining.NetworkGrabbable
   interactable: {fileID: 0}
   _Holder: 0
+  _HolderActorId: 0
+  _HolderRevision: 0
   _LastHandoffFrom: 0
   _LastHandoffTo: 0
   _HandoffCount: 0
@@ -6700,7 +6704,7 @@ MonoBehaviour:
   SyncScale: 0
   SyncParent: 0
   _autoAOIOverride: 1
-  ConfigFlags: 0
+  ConfigFlags: 1
   PhysicsSettings:
     ForecastEnabled: 0
     DebugPhysics: 0
@@ -12058,6 +12062,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TireTraining.NetworkGrabbable
   interactable: {fileID: 0}
   _Holder: 0
+  _HolderActorId: 0
+  _HolderRevision: 0
   _LastHandoffFrom: 0
   _LastHandoffTo: 0
   _HandoffCount: 0
@@ -12079,7 +12085,7 @@ MonoBehaviour:
   SyncScale: 0
   SyncParent: 0
   _autoAOIOverride: 1
-  ConfigFlags: 0
+  ConfigFlags: 1
   PhysicsSettings:
     ForecastEnabled: 0
     DebugPhysics: 0
@@ -28139,6 +28145,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TireTraining.NetworkGrabbable
   interactable: {fileID: 0}
   _Holder: 0
+  _HolderActorId: 0
+  _HolderRevision: 0
   _LastHandoffFrom: 0
   _LastHandoffTo: 0
   _HandoffCount: 0
@@ -28160,7 +28168,7 @@ MonoBehaviour:
   SyncScale: 0
   SyncParent: 0
   _autoAOIOverride: 1
-  ConfigFlags: 0
+  ConfigFlags: 1
   PhysicsSettings:
     ForecastEnabled: 0
     DebugPhysics: 0
@@ -29591,6 +29599,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TireTraining.NetworkGrabbable
   interactable: {fileID: 0}
   _Holder: 0
+  _HolderActorId: 0
+  _HolderRevision: 0
   _LastHandoffFrom: 0
   _LastHandoffTo: 0
   _HandoffCount: 0
@@ -29612,7 +29622,7 @@ MonoBehaviour:
   SyncScale: 0
   SyncParent: 0
   _autoAOIOverride: 1
-  ConfigFlags: 0
+  ConfigFlags: 1
   PhysicsSettings:
     ForecastEnabled: 0
     DebugPhysics: 0

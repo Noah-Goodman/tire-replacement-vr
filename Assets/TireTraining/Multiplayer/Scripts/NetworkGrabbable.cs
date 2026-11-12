@@ -12,7 +12,7 @@ namespace TireTraining
     /// holds it and every hand-to-hand handoff, keeps the Rigidbody kinematic on devices without state authority,
     /// and hides the item from local snap zones while the other player holds it.
     /// Needs <b>Allow State Authority Override</b> on the NetworkObject. When the object is not spawned (no session),
-    /// it does nothing at all.
+    /// it only keeps the Rigidbody interpolation rule for local hand holds.
     /// The grab interactable is found lazily: the serialized field, else one on this GameObject, checked every
     /// frame until one exists, because some items get theirs at runtime.
     /// </summary>
@@ -73,6 +73,8 @@ namespace TireTraining
         private InteractionLayerMask savedLayers;
         private bool layersDropped;
         private bool pendingRequest;
+        private XRGrabInteractable handGrab;
+        private Rigidbody handBody;
 
         private const float RecoveryIntervalSeconds = 0.5f;
         private const float RecoveryTimeoutSeconds = 10f;
@@ -124,6 +126,11 @@ namespace TireTraining
 
         private void OnDisable()
         {
+            if (handBody != null)
+            {
+                handBody.interpolation = RigidbodyInterpolation.None;
+            }
+
             pendingRequest = false;
             recoveryScanPending = true;
             CancelDepartureRecovery();
@@ -155,9 +162,57 @@ namespace TireTraining
         // re-applied after they have run, every frame.
         private void LateUpdate()
         {
+            ApplyHandHoldInterpolation();
             if (spawned)
             {
                 ApplyLocalRules();
+            }
+        }
+
+        /// <summary>
+        /// Interpolation smooths a Rigidbody that XRI moves on 50 Hz physics steps, which a hand-held item needs.
+        /// An item carried by its parent (the car lifting a wheel) or by a socket is moved through its Transform
+        /// and trails the carrier when interpolated, so only a local hand hold interpolates. XRI saves the value
+        /// when the first selection begins and restores it when the last ends; this runs after both every frame,
+        /// so the restored value is overwritten. It needs no session: it reads the grab interactable and
+        /// Rigidbody itself, so it also applies to an item that is never spawned.
+        /// </summary>
+        private void ApplyHandHoldInterpolation()
+        {
+            XRGrabInteractable grab = bound != null ? bound : handGrab;
+            if (grab == null)
+            {
+                grab = interactable != null ? interactable : GetComponent<XRGrabInteractable>();
+                handGrab = grab;
+                if (grab == null)
+                {
+                    return;
+                }
+            }
+
+            if (handBody == null)
+            {
+                handBody = grab.GetComponent<Rigidbody>();
+                if (handBody == null)
+                {
+                    return;
+                }
+            }
+
+            bool held = false;
+            foreach (IXRSelectInteractor selecting in grab.interactorsSelecting)
+            {
+                if (IsHand(selecting))
+                {
+                    held = true;
+                    break;
+                }
+            }
+
+            RigidbodyInterpolation wanted = held ? RigidbodyInterpolation.Interpolate : RigidbodyInterpolation.None;
+            if (handBody.interpolation != wanted)
+            {
+                handBody.interpolation = wanted;
             }
         }
 
@@ -210,6 +265,11 @@ namespace TireTraining
                 if (body != null && kinematicForced)
                 {
                     body.isKinematic = bodyDefaultKinematic;
+                }
+
+                if (body != null)
+                {
+                    body.interpolation = RigidbodyInterpolation.None;
                 }
             }
 
