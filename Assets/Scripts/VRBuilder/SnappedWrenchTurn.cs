@@ -128,9 +128,9 @@ namespace TireTraining
             if (!LocalMayChangeState)
             {
                 // Nut and wrench state arrive over the network here; the grip stays unusable.
-                if (turnGrip.enabled)
+                if (GripStateDiffers(false))
                 {
-                    turnGrip.enabled = false;
+                    SetGripEnabled(false);
                 }
 
                 selectingHand = null;
@@ -164,9 +164,9 @@ namespace TireTraining
             }
 
             bool gripShouldBeEnabled = isSnapped && !turnCompleted;
-            if (turnGrip.enabled != gripShouldBeEnabled)
+            if (GripStateDiffers(gripShouldBeEnabled))
             {
-                turnGrip.enabled = gripShouldBeEnabled;
+                SetGripEnabled(gripShouldBeEnabled);
             }
 
             if (!gripShouldBeEnabled || selectingHand == null)
@@ -233,13 +233,66 @@ namespace TireTraining
 
                     DegreesTurned = requiredDegrees;
                     selectingHand = null;
-                    turnGrip.enabled = false;
+                    SetGripEnabled(false);
                     if (removingBolts)
                     {
                         RemoveCurrentLugNut();
                     }
 
                     FinishCurrentTurn();
+                }
+            }
+        }
+
+        /// <summary>
+        /// True when the grip interactable or any of its colliders is not in the given enabled state.
+        /// </summary>
+        private bool GripStateDiffers(bool on)
+        {
+            if (turnGrip.enabled != on)
+            {
+                return true;
+            }
+
+            foreach (Collider gripCollider in turnGrip.colliders)
+            {
+                if (gripCollider != null && gripCollider.enabled != on)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Turns the grip interactable and its colliders on or off together. An enabled grip
+        /// collider is a solid box that blocks interactor rays to objects behind it, so it
+        /// stays off whenever the grip cannot be used.
+        /// Colliders go on before the interactable and off after it, so the interactable
+        /// never runs without its colliders.
+        /// </summary>
+        private void SetGripEnabled(bool on)
+        {
+            if (on)
+            {
+                SetGripCollidersEnabled(true);
+                turnGrip.enabled = true;
+            }
+            else
+            {
+                turnGrip.enabled = false;
+                SetGripCollidersEnabled(false);
+            }
+        }
+
+        private void SetGripCollidersEnabled(bool on)
+        {
+            foreach (Collider gripCollider in turnGrip.colliders)
+            {
+                if (gripCollider != null)
+                {
+                    gripCollider.enabled = on;
                 }
             }
         }
