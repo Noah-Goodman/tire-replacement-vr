@@ -41,13 +41,30 @@ namespace TireTraining
         private bool fetcherTaken;
         private bool assemblerTaken;
         private bool lobbyLoopRunning;
+        private int attemptGeneration;
+
+        internal static int JoinFadeToken { get; private set; }
+
+        internal static void ReleaseJoinFade(int token)
+        {
+            if (JoinFadeToken == token)
+            {
+                JoinFadeToken = 0;
+            }
+        }
+
+        private static void CancelJoinFade(int token)
+        {
+            ScreenFader.CancelFade(token);
+            ReleaseJoinFade(token);
+        }
 
         public bool IsLobbyReady { get; private set; }
         public bool IsJoining { get; private set; }
 
         public bool IsRoleAvailable(Role role)
         {
-            if (!IsLobbyReady || role == Role.None)
+            if (!IsLobbyReady || (role != Role.Fetcher && role != Role.Assembler))
             {
                 return false;
             }
@@ -58,6 +75,7 @@ namespace TireTraining
         private async void Start()
         {
             ScreenFader.FadeIn();
+            JoinFadeToken = 0;
             ShowMessage(LobbyMessage);
             LobbyMessage = null;
 
@@ -68,7 +86,7 @@ namespace TireTraining
                     NetworkRunner old = Runner;
                     Runner = null;
                     await ShutdownRunner(old);
-                    if (this == null)
+                    if (this == null || !isActiveAndEnabled || Runner != null)
                     {
                         return;
                     }
@@ -93,15 +111,16 @@ namespace TireTraining
         /// <summary>Creates a runner and joins the lobby, retrying every few seconds until it works or this component is destroyed.</summary>
         private async Task RunLobbyLoop()
         {
-            if (lobbyLoopRunning)
+            if (returningToLobby || this == null || !isActiveAndEnabled || lobbyLoopRunning || Runner != null || IsJoining)
             {
                 return;
             }
 
             lobbyLoopRunning = true;
+            int generation = attemptGeneration;
             try
             {
-                while (this != null && !IsLobbyReady)
+                while (!returningToLobby && this != null && isActiveAndEnabled && generation == attemptGeneration && !IsLobbyReady && !IsJoining && Runner == null)
                 {
                     NetworkRunner runner = CreateRunner();
                     Runner = runner;
@@ -110,7 +129,7 @@ namespace TireTraining
                     try
                     {
                         StartGameResult result = await runner.JoinSessionLobby(SessionLobby.Shared);
-                        if (this == null)
+                        if (!IsCurrentAttempt(generation, runner))
                         {
                             return;
                         }
@@ -126,7 +145,7 @@ namespace TireTraining
                     }
                     catch (Exception e)
                     {
-                        if (this == null)
+                        if (!IsCurrentAttempt(generation, runner))
                         {
                             return;
                         }
@@ -143,7 +162,7 @@ namespace TireTraining
                     }
 
                     await ShutdownRunner(runner);
-                    if (this == null)
+                    if (!IsCurrentAttempt(generation, null))
                     {
                         return;
                     }
@@ -160,77 +179,120 @@ namespace TireTraining
             }
         }
 
-        /// <summary>
-        /// Starts the shared session as <paramref name="role"/>. Ignored unless the lobby is ready,
-        /// the role is available and no join is already running.
-        /// </summary>
-        public async void Join(Role role)
+        /// <summary>Compatibility entry point for callers that do not need an acceptance result.</summary>
+        public void Join(Role role) => TryJoin(role);
+
+        /// <summary>Accepts an available role synchronously; a rejected caller retains its fade ownership.</summary>
+        public bool TryJoin(Role role, int fadeToken = 0)
         {
-            if (IsJoining || !IsRoleAvailable(role) || Runner == null)
+            NetworkRunner runner = Runner;
+            if (returningToLobby || this == null || !isActiveAndEnabled || IsJoining || !IsRoleAvailable(role)
+                || runner == null || !runner.isActiveAndEnabled || !runner.IsCloudReady)
             {
-                return;
+                return false;
             }
 
             IsJoining = true;
             ChosenRole = role;
+            JoinFadeToken = fadeToken == 0 ? ScreenFader.CurrentFadeToken : fadeToken;
+            int generation = ++attemptGeneration;
+            _ = JoinRoutine(runner, generation, JoinFadeToken);
+            return true;
+        }
 
+        private bool IsCurrentAttempt(int generation, NetworkRunner expected)
+        {
+            return !returningToLobby && this != null && isActiveAndEnabled && generation == attemptGeneration && Runner == expected;
+        }
+
+        private async Task JoinRoutine(NetworkRunner expected, int generation, int fadeToken)
+        {
             try
             {
-                StartGameResult result = await StartSharedGame(Runner);
+                StartGameResult result = await StartSharedGame(expected);
                 if (result.Ok)
                 {
-                    // MainScene is loading; this component is destroyed with RoleSelectScene.
+                    // A destroyed lobby launcher is expected after this runner's successful scene load.
+                    if (Runner != expected || (this != null && (!isActiveAndEnabled || generation != attemptGeneration)))
+                    {
+                        CancelJoinFade(fadeToken);
+                    }
+
+                    return;
+                }
+
+                if (!IsCurrentAttempt(generation, expected))
+                {
+                    CancelJoinFade(fadeToken);
                     return;
                 }
 
                 Debug.LogWarning($"SessionLauncher: StartGame after the lobby join failed ({result.ShutdownReason}): {result.ErrorMessage}. Retrying with a new runner.");
-
-                NetworkRunner lobbyRunner = Runner;
+                NetworkRunner lobbyRunner = expected;
                 Runner = null;
+                expected = null;
                 await ShutdownRunner(lobbyRunner);
-                if (this == null)
+                if (!IsCurrentAttempt(generation, null))
                 {
+                    CancelJoinFade(fadeToken);
                     return;
                 }
 
-                NetworkRunner fresh = CreateRunner();
-                Runner = fresh;
-                result = await StartSharedGame(fresh);
+                expected = CreateRunner();
+                Runner = expected;
+                result = await StartSharedGame(expected);
                 if (result.Ok)
                 {
+                    if (Runner != expected || (this != null && (!isActiveAndEnabled || generation != attemptGeneration)))
+                    {
+                        CancelJoinFade(fadeToken);
+                    }
+
+                    return;
+                }
+
+                if (!IsCurrentAttempt(generation, expected))
+                {
+                    CancelJoinFade(fadeToken);
                     return;
                 }
 
                 Debug.LogWarning($"SessionLauncher: StartGame with a new runner failed ({result.ShutdownReason}): {result.ErrorMessage}");
-                await FailJoin(result.ErrorMessage);
+                await FailJoin(result.ErrorMessage, expected, generation, fadeToken);
             }
             catch (Exception e)
             {
                 Debug.LogWarning($"SessionLauncher: join failed: {e.Message}");
-                if (this != null)
+                if (!IsCurrentAttempt(generation, expected))
                 {
-                    try
-                    {
-                        await FailJoin(e.Message);
-                    }
-                    catch (Exception inner)
-                    {
-                        Debug.LogWarning($"SessionLauncher: recovery failed: {inner.Message}");
-                    }
+                    CancelJoinFade(fadeToken);
+                    return;
+                }
+
+                try
+                {
+                    await FailJoin(e.Message, expected, generation, fadeToken);
+                }
+                catch (Exception inner)
+                {
+                    CancelJoinFade(fadeToken);
+                    Debug.LogWarning($"SessionLauncher: recovery failed: {inner.Message}");
                 }
             }
         }
 
-        private async Task FailJoin(string reason)
+        private async Task FailJoin(string reason, NetworkRunner expected, int generation, int fadeToken)
         {
-            NetworkRunner dead = Runner;
-            Runner = null;
-            if (dead != null)
+            if (!IsCurrentAttempt(generation, expected))
             {
-                await ShutdownRunner(dead);
+                CancelJoinFade(fadeToken);
+                return;
             }
 
-            if (this == null)
+            Runner = null;
+            await ShutdownRunner(expected);
+            CancelJoinFade(fadeToken);
+            if (!IsCurrentAttempt(generation, null))
             {
                 return;
             }
@@ -240,7 +302,6 @@ namespace TireTraining
             IsLobbyReady = false;
             fetcherTaken = false;
             assemblerTaken = false;
-            ScreenFader.FadeIn();
             ShowMessage($"Could not join: {reason}");
             await RunLobbyLoop();
         }
@@ -399,10 +460,11 @@ namespace TireTraining
 
         private async Task RestartLobby(NetworkRunner dead)
         {
+            int generation = attemptGeneration;
             try
             {
                 await ShutdownRunner(dead);
-                if (this == null)
+                if (!IsCurrentAttempt(generation, null))
                 {
                     return;
                 }

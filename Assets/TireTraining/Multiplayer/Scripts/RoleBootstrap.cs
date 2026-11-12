@@ -36,30 +36,73 @@ namespace TireTraining
 
         private bool avatarSpawned;
         private bool destroyed;
+        private Coroutine setup;
+        private NetworkRunner capturedRunner;
+        private int fadeToken;
+        private bool pending;
 
         private void Start()
         {
             LocalRole = Role.None;
 
-            NetworkRunner runner = SessionLauncher.Runner;
+            capturedRunner = SessionLauncher.Runner;
+            fadeToken = SessionLauncher.JoinFadeToken;
+            pending = true;
+            NetworkRunner runner = capturedRunner;
             if (runner == null || (!runner.IsRunning && !runner.IsStarting))
             {
                 Debug.Log("RoleBootstrap: no running network session; skipping role setup.");
+                ClearPendingFade();
                 return;
             }
 
-            StartCoroutine(Run(runner));
+            setup = StartCoroutine(Run(runner));
+        }
+
+        private void OnDisable()
+        {
+            if (setup != null)
+            {
+                StopCoroutine(setup);
+                setup = null;
+            }
+
+            ClearPendingFade();
+        }
+
+        private void ClearPendingFade()
+        {
+            if (!pending)
+            {
+                return;
+            }
+
+            pending = false;
+            ScreenFader.CancelFade(fadeToken);
+            SessionLauncher.ReleaseJoinFade(fadeToken);
+        }
+
+        private void FailSetup(string message)
+        {
+            bool current = !Abandoned(capturedRunner);
+            ClearPendingFade();
+            if (current)
+            {
+                SessionLauncher.ReturnToLobby(message);
+            }
         }
 
         private void OnDestroy()
         {
             destroyed = true;
+            ClearPendingFade();
             LocalRole = Role.None;
         }
 
         private bool Abandoned(NetworkRunner runner)
         {
-            return destroyed || this == null || runner == null || SessionLauncher.Runner != runner;
+            return destroyed || this == null || !isActiveAndEnabled || runner == null
+                || SessionLauncher.Runner != runner || (!runner.IsRunning && !runner.IsStarting);
         }
 
         private IEnumerator Run(NetworkRunner runner)
@@ -67,21 +110,27 @@ namespace TireTraining
             Role role = SessionLauncher.ChosenRole;
             if (role == Role.None)
             {
-                SessionLauncher.ReturnToLobby("No role was chosen. Pick a role to join.");
+                FailSetup("No role was chosen. Pick a role to join.");
                 yield break;
             }
 
             float deadline = Time.unscaledTime + WaitSeconds;
-            while (!runner.IsRunning || SessionState.Instance == null)
+            while (true)
             {
                 if (Abandoned(runner))
                 {
+                    ClearPendingFade();
                     yield break;
+                }
+
+                if (runner.IsRunning && SessionState.Instance != null)
+                {
+                    break;
                 }
 
                 if (Time.unscaledTime > deadline)
                 {
-                    SessionLauncher.ReturnToLobby("Couldn't claim the role. Try again.");
+                    FailSetup("Couldn't claim the role. Try again.");
                     yield break;
                 }
 
@@ -94,24 +143,26 @@ namespace TireTraining
             {
                 if (Abandoned(runner))
                 {
+                    ClearPendingFade();
                     yield break;
                 }
 
                 SessionState state = SessionState.Instance;
-                if (state != null && state.Object != null && state.Object.IsValid && state.GetPlayer(role) == runner.LocalPlayer)
+                if (state != null && state.Object != null && state.Object.IsValid && state.Runner == runner && state.GetPlayer(role) == runner.LocalPlayer)
                 {
                     break;
                 }
 
                 if (Time.unscaledTime > deadline)
                 {
-                    SessionLauncher.ReturnToLobby("Couldn't claim the role. Try again.");
+                    FailSetup("Couldn't claim the role. Try again.");
                     yield break;
                 }
 
                 // Re-sending is safe: a claim the player already holds is ignored, and the claim is
                 // lost only if the state authority changed while it was in flight.
-                if (state != null && Time.unscaledTime >= nextSend)
+                if (state != null && state.Object != null && state.Object.IsValid
+                    && state.Runner == runner && Time.unscaledTime >= nextSend)
                 {
                     nextSend = Time.unscaledTime + ClaimResendSeconds;
                     state.RPC_ClaimRole(role, runner.LocalPlayer);
@@ -125,13 +176,29 @@ namespace TireTraining
 
         private void Complete(NetworkRunner runner, Role role)
         {
+            if (Abandoned(runner))
+            {
+                ClearPendingFade();
+                return;
+            }
+
             if (avatarSpawned)
             {
                 return;
             }
 
             Transform spawn = role == Role.Fetcher ? fetcherSpawn : assemblerSpawn;
-            MoveOrigin(spawn);
+            if (!MoveOrigin(spawn))
+            {
+                FailSetup("Couldn't move you to your spawn point. Try again.");
+                return;
+            }
+
+            if (Abandoned(runner))
+            {
+                ClearPendingFade();
+                return;
+            }
 
             avatarSpawned = true;
             NetworkObject spawned = null;
@@ -163,22 +230,31 @@ namespace TireTraining
 
             if (spawned == null)
             {
-                SessionLauncher.ReturnToLobby("Couldn't create your avatar. Try again.");
+                FailSetup("Couldn't create your avatar. Try again.");
                 return;
             }
 
+            if (Abandoned(runner))
+            {
+                ClearPendingFade();
+                return;
+            }
+
+            pending = false;
+            setup = null;
             LocalRole = role;
             LocalRoleReady?.Invoke(role);
-            ScreenFader.FadeIn();
+            ScreenFader.CancelFade(fadeToken);
+            SessionLauncher.ReleaseJoinFade(fadeToken);
         }
 
         /// <summary>Moves the XR Origin to the spawn point's position and yaw; pitch and roll stay level.</summary>
-        private void MoveOrigin(Transform spawn)
+        private bool MoveOrigin(Transform spawn)
         {
             if (spawn == null || xrOrigin == null)
             {
                 Debug.LogWarning("RoleBootstrap: spawn point or XR Origin is not set; the rig was not moved.");
-                return;
+                return false;
             }
 
             Transform origin = xrOrigin.transform;
@@ -195,6 +271,8 @@ namespace TireTraining
             {
                 controller.enabled = true;
             }
+
+            return true;
         }
     }
 }

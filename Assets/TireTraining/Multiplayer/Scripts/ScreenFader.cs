@@ -18,6 +18,8 @@ namespace TireTraining
         private const float BoxSize = 0.4f;
 
         private static ScreenFader instance;
+        private static int nextFadeToken;
+        private int activeFadeToken;
 
         [Tooltip("Black, drawn over everything (ZTest Always, render queue 5000). Built from the WaypointOnTop shader with _Sprite off.")]
         [SerializeField] private Material fadeMaterial;
@@ -36,20 +38,50 @@ namespace TireTraining
         /// <summary>True when the view is fully covered.</summary>
         public static bool IsBlack => instance != null && instance.alpha >= 0.999f;
 
-        /// <summary>Starts fading to black.</summary>
-        public static void FadeOut()
+        public static int CurrentFadeToken => instance != null ? instance.activeFadeToken : 0;
+
+        /// <summary>Starts fading to black and returns ownership of this transition, or zero without a fader.</summary>
+        public static int BeginFadeOut()
         {
-            if (instance != null)
+            if (instance == null)
             {
-                instance.target = 1f;
+                return 0;
+            }
+
+            unchecked
+            {
+                ++nextFadeToken;
+                if (nextFadeToken == 0)
+                {
+                    ++nextFadeToken;
+                }
+            }
+
+            instance.activeFadeToken = nextFadeToken;
+            instance.target = 1f;
+            return nextFadeToken;
+        }
+
+        /// <summary>Starts fading to black.</summary>
+        public static void FadeOut() => BeginFadeOut();
+
+        public static bool IsFadeOwner(int token) => token != 0 && token == CurrentFadeToken;
+
+        /// <summary>Reverses only the transition owned by this token.</summary>
+        public static void CancelFade(int token)
+        {
+            if (IsFadeOwner(token))
+            {
+                FadeIn();
             }
         }
 
-        /// <summary>Starts fading back in.</summary>
+        /// <summary>Starts fading back in and invalidates the current owner.</summary>
         public static void FadeIn()
         {
             if (instance != null)
             {
+                instance.activeFadeToken = 0;
                 instance.target = 0f;
             }
         }
@@ -158,14 +190,14 @@ namespace TireTraining
                 if (target >= 1f && blackTime >= maxBlackSeconds)
                 {
                     Debug.LogWarning($"ScreenFader: the view was black for {maxBlackSeconds:0} s; fading in.");
-                    target = 0f;
+                    FadeIn();
                 }
             }
 
             if (!Mathf.Approximately(alpha, target))
             {
                 float seconds = target > alpha ? fadeOutSeconds : fadeInSeconds;
-                float step = seconds <= 0f ? 1f : dt / seconds;
+                float step = seconds <= 0f ? 1f : Mathf.Min(dt, 0.1f) / seconds;
                 alpha = Mathf.MoveTowards(alpha, target, step);
             }
 

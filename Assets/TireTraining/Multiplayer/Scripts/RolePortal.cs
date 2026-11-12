@@ -73,6 +73,9 @@ namespace TireTraining
         private bool inside;
         private bool entering;
         private Coroutine flare;
+        private Coroutine entry;
+        private int fadeToken;
+        private bool handedToJoin;
 
         private bool flareCached;
         private Vector3 haloBaseScale;
@@ -84,6 +87,20 @@ namespace TireTraining
 
         private void OnDisable()
         {
+            if (entry != null)
+            {
+                StopCoroutine(entry);
+                entry = null;
+            }
+
+            if (!handedToJoin)
+            {
+                ScreenFader.CancelFade(fadeToken);
+            }
+
+            fadeToken = 0;
+            handedToJoin = false;
+            inside = false;
             if (flare != null)
             {
                 StopCoroutine(flare);
@@ -168,12 +185,13 @@ namespace TireTraining
             }
 
             inside = true;
-            StartCoroutine(EnterRoutine());
+            entry = StartCoroutine(EnterRoutine());
         }
 
         private IEnumerator EnterRoutine()
         {
             entering = true;
+            handedToJoin = false;
 
             if (flare != null)
             {
@@ -193,32 +211,51 @@ namespace TireTraining
             {
                 if (!IsFree())
                 {
-                    entering = false;
+                    FinishEntry();
                     yield break;
                 }
 
                 yield return null;
             }
 
-            if (!IsFree())
+            if (!isActiveAndEnabled || !IsFree())
             {
-                entering = false;
+                FinishEntry();
                 yield break;
             }
 
-            ScreenFader.FadeOut();
+            fadeToken = ScreenFader.BeginFadeOut();
             yield return ScreenFader.WaitForFadeOut();
 
-            if (launcher != null && IsFree())
+            if (isActiveAndEnabled && launcher != null && IsFree()
+                && (fadeToken == 0 || ScreenFader.IsFadeOwner(fadeToken)))
             {
-                launcher.Join(role);
-            }
-            else
-            {
-                ScreenFader.FadeIn();
+                // A synchronous scene unload during acceptance must preserve the handed-off black view.
+                handedToJoin = true;
+                if (launcher.TryJoin(role, fadeToken))
+                {
+                    fadeToken = 0;
+                    FinishEntry();
+                    yield break;
+                }
+
+                handedToJoin = false;
             }
 
+            FinishEntry();
+        }
+
+        private void FinishEntry()
+        {
+            if (!handedToJoin)
+            {
+                ScreenFader.CancelFade(fadeToken);
+            }
+
+            fadeToken = 0;
+            handedToJoin = false;
             entering = false;
+            entry = null;
         }
 
         private IEnumerator FlareRoutine()
