@@ -75,6 +75,8 @@ namespace TireTraining
         private bool pendingRequest;
         private XRGrabInteractable handGrab;
         private Rigidbody handBody;
+        private const float SocketAuthorityRequestIntervalSeconds = 1f;
+        private float nextSocketAuthorityRequestTime;
 
         private const float RecoveryIntervalSeconds = 0.5f;
         private const float RecoveryTimeoutSeconds = 10f;
@@ -97,6 +99,7 @@ namespace TireTraining
 
         public override void Spawned()
         {
+            nextSocketAuthorityRequestTime = 0f;
             spawned = true;
             TryBind();
             ApplyLocalRules();
@@ -107,6 +110,7 @@ namespace TireTraining
 
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
+            nextSocketAuthorityRequestTime = 0f;
             Unbind(true);
             spawned = false;
             pendingRequest = false;
@@ -315,6 +319,8 @@ namespace TireTraining
                 return;
             }
 
+            RequestLocalSocketAuthority();
+
             if (body == null)
             {
                 body = bound.GetComponent<Rigidbody>();
@@ -354,6 +360,31 @@ namespace TireTraining
             {
                 bound.interactionLayers = savedLayers;
                 layersDropped = false;
+            }
+        }
+
+        /// <summary>
+        /// RoleGate enables car sockets only for the Assembler and garage sockets only for the Fetcher.
+        /// A local socket may own an unheld item; hand acquisition and a remote holder always take precedence.
+        /// </summary>
+        private void RequestLocalSocketAuthority()
+        {
+            if (!HasState || !isActiveAndEnabled || bound == null || RoleBootstrap.LocalRole == Role.None
+                || Object.HasStateAuthority || Holder != Role.None || pendingRequest || IsHeldByLocalHand()
+                || Time.unscaledTime < nextSocketAuthorityRequestTime)
+            {
+                return;
+            }
+
+            foreach (IXRSelectInteractor selecting in bound.interactorsSelecting)
+            {
+                if (selecting is XRSocketInteractor socket && socket.isActiveAndEnabled && socket.socketActive
+                    && socket.IsSelecting((IXRSelectInteractable)bound))
+                {
+                    nextSocketAuthorityRequestTime = Time.unscaledTime + SocketAuthorityRequestIntervalSeconds;
+                    Object.RequestStateAuthority();
+                    return;
+                }
             }
         }
 

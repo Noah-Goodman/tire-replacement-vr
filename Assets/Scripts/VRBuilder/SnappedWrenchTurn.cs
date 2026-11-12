@@ -24,6 +24,7 @@ namespace TireTraining
         [SerializeField] private float requiredDegrees = 360f;
         [SerializeField] private Transform wheelWithNuts;
         [SerializeField] private SnapZoneProperty lugNutSnapZone;
+        [SerializeField] private Transform car;
         [SerializeField] private Transform replacementNuts;
 
         /// <summary>
@@ -51,6 +52,8 @@ namespace TireTraining
         private Transform[] lugNuts;
         private int currentBoltIndex;
         private Vector3 firstSnapZonePosition;
+        private Vector3 firstSnapZoneCarLocalPosition;
+        private Vector3 firstTighteningSnapZonePosition;
         private Vector3 firstLugNutPosition;
         private Transform initialWrenchParent;
         private Vector3 initialWrenchLocalPosition;
@@ -66,6 +69,7 @@ namespace TireTraining
         private Renderer wheelRenderer;
         private MaterialPropertyBlock originalWheelProperties;
         private bool wheelWasGrabbed;
+        private GrabbableProperty recoveryGrabbableToRestore;
 
         private void Awake()
         {
@@ -92,6 +96,7 @@ namespace TireTraining
 
         private void OnEnable()
         {
+            RestoreRecoveryGrabbableLock();
             if (turnGrip != null)
             {
                 turnGrip.selectEntered.AddListener(OnGripSelected);
@@ -101,6 +106,7 @@ namespace TireTraining
 
         private void OnDisable()
         {
+            RestoreRecoveryGrabbableLock();
             if (turnGrip != null)
             {
                 turnGrip.selectEntered.RemoveListener(OnGripSelected);
@@ -132,6 +138,17 @@ namespace TireTraining
             }
 
             bool isSnapped = wrench.IsSnapped;
+            if (isSnapped && lugNutSnapZone != null
+                && (wrench.SnappedZone as SnapZoneProperty) == lugNutSnapZone)
+            {
+                XRGrabInteractable grabbable = wrench.GetComponent<XRGrabInteractable>();
+                if (grabbable != null && lugNutSnapZone.SnapZone != null
+                    && lugNutSnapZone.SnapZone.IsSelecting((IXRSelectInteractable)grabbable))
+                {
+                    RestoreRecoveryGrabbableLock();
+                }
+            }
+
             if (isSnapped != wasSnapped)
             {
                 if (isSnapped)
@@ -233,6 +250,35 @@ namespace TireTraining
         /// </summary>
         private float TurnDirection => tighteningBolts ? -1f : 1f;
 
+        private void LateUpdate()
+        {
+            if (!LocalMayChangeState || wrench == null || lugNutSnapZone == null
+                || (wrench.SnappedZone as SnapZoneProperty) != lugNutSnapZone || (removingBolts && turnCompleted)
+                || CurrentNuts == null || CurrentNuts[CurrentNutIndex] == null)
+            {
+                return;
+            }
+
+            XRGrabInteractable grabbable = wrench.GetComponent<XRGrabInteractable>();
+            if (grabbable == null)
+            {
+                return;
+            }
+
+            foreach (IXRSelectInteractor selecting in grabbable.interactorsSelecting)
+            {
+                if (!(selecting is XRSocketInteractor))
+                {
+                    return;
+                }
+            }
+
+            Vector3 delta = CurrentSnapZonePosition - lugNutSnapZone.transform.position;
+            lugNutSnapZone.transform.position = CurrentSnapZonePosition;
+            // XRI may already have updated its socket pose this frame; carry the wrench by the same delta.
+            wrench.transform.position += delta;
+        }
+
         private Transform[] CurrentNuts => tighteningBolts ? replacementLugNuts : lugNuts;
 
         /// <summary>
@@ -287,7 +333,7 @@ namespace TireTraining
                 if (removingBolts)
                 {
                     ReturnWrenchToBench();
-                    lugNutSnapZone.transform.position = firstSnapZonePosition;
+                    lugNutSnapZone.transform.position = CurrentCarInitialSnapZonePosition;
                 }
 
                 turnCompleted = true;
@@ -382,14 +428,15 @@ namespace TireTraining
             bool wrenchMoved = PlaceWrenchOnCurrentBolt(zone, anchor);
             Debug.Log(wrenchMoved
                 ? "Remove each lug nut with one more full counterclockwise turn. Wrench returned to nut 1."
-                : "Remove each lug nut with one more full counterclockwise turn. Place the held wrench on nut 1.", this);
+                : "Remove each lug nut with one more full counterclockwise turn. Place the wrench on nut 1.", this);
         }
 
         /// <summary>
         /// Starts a clockwise pass on the replacement wheel's nuts. The first
-        /// pass snugs them in order 1 to 5; its wrench snap zone stays at its
-        /// first position, which lines up with replacement nut 1, so the learner
-        /// places the wrench there. A pass started after the previous one
+        /// pass snugs them in order 1 to 5, starting at the initial socket point
+        /// carried by the car. It captures that world origin and nut 1's position
+        /// so later placement follows the replacement nuts as the car lowers.
+        /// A pass started after the previous one
         /// finished is final tightening, after the car is lowered: it moves the
         /// snap zone and wrench back to nut 1 and follows the star pattern.
         /// </summary>
@@ -425,8 +472,9 @@ namespace TireTraining
 
             if (!repeatPass)
             {
+                firstTighteningSnapZonePosition = CurrentCarInitialSnapZonePosition;
                 firstReplacementNutPosition = replacementLugNuts[0].position;
-                lugNutSnapZone.transform.position = firstSnapZonePosition;
+                lugNutSnapZone.transform.position = firstTighteningSnapZonePosition;
                 Debug.Log("Tighten each replacement lug nut with one full clockwise turn.", this);
                 return;
             }
@@ -434,17 +482,31 @@ namespace TireTraining
             bool wrenchMoved = PlaceWrenchOnCurrentBolt(zone, anchor);
             Debug.Log(wrenchMoved
                 ? "Car lowered. Wrench moved to lug nut 1 for final tightening in a star pattern: 1, 3, 5, 2, 4."
-                : "Car lowered. Place the held wrench on lug nut 1 for final tightening in a star pattern: 1, 3, 5, 2, 4.", this);
+                : "Car lowered. Place the wrench on lug nut 1 for final tightening in a star pattern: 1, 3, 5, 2, 4.", this);
         }
 
         /// <summary>
-        /// Moves the wrench snap zone to the current nut and carries the wrench
-        /// with it, snapping the wrench in if it is lying loose. Returns false
-        /// when the learner is holding the wrench and must place it themselves.
+        /// Moves the socket to the current nut, carrying its snapped wrench or selecting a loose wrench.
+        /// An empty socket and a locked wrench grabbable are unlocked for placement, including held release.
+        /// The wrench's prior grabbable lock is requested again after actual placement or cancellation.
+        /// Returns true only when this socket actually selects the wrench.
         /// </summary>
         private bool PlaceWrenchOnCurrentBolt(XRSocketInteractor zone, Transform anchor)
         {
-            if (wrench.IsSnapped)
+            if (zone == null || anchor == null || lugNutSnapZone == null)
+            {
+                Debug.LogWarning("Cannot place the wrench: the lug nut snap zone or its anchor is missing.", this);
+                return false;
+            }
+
+            XRGrabInteractable grabbable = wrench.GetComponent<XRGrabInteractable>();
+            if (grabbable == null)
+            {
+                Debug.LogWarning("Cannot place the wrench: its XRGrabInteractable is missing.", this);
+                return false;
+            }
+
+            if ((wrench.SnappedZone as SnapZoneProperty) == lugNutSnapZone && zone.IsSelecting((IXRSelectInteractable)grabbable))
             {
                 snapAnchor = anchor;
                 initialAnchorRotation = anchor.localRotation;
@@ -452,24 +514,74 @@ namespace TireTraining
                 MoveSnapZoneToCurrentBolt();
                 wrench.transform.SetPositionAndRotation(
                     snapAnchor.position + wrenchOffset, snapAnchor.rotation);
+                RestoreRecoveryGrabbableLock();
                 return true;
             }
 
             MoveSnapZoneToCurrentBolt();
-            XRGrabInteractable grabbable = wrench.GetComponent<XRGrabInteractable>();
-            if (grabbable == null || grabbable.isSelected)
+            if (!zone.hasSelection)
             {
+                lugNutSnapZone.SetLocked(false);
+            }
+
+            GrabbableProperty grabProperty = wrench.GetComponent<GrabbableProperty>();
+            if (grabProperty == null)
+            {
+                Debug.LogWarning("Cannot place the wrench: its GrabbableProperty is missing.", this);
+                return false;
+            }
+
+            if (grabProperty.IsLocked)
+            {
+                if (recoveryGrabbableToRestore == null)
+                {
+                    recoveryGrabbableToRestore = grabProperty;
+                }
+
+                grabProperty.SetLocked(false);
+            }
+
+            if (grabbable.isSelected || wrench.IsSnapped)
+            {
+                Debug.LogWarning("Cannot place the wrench automatically: a hand or another socket selects it. Release it into the lug nut snap zone.", this);
+                return false;
+            }
+
+            XRInteractionManager manager = zone.interactionManager;
+            if (manager == null)
+            {
+                Debug.LogWarning("Cannot place the free wrench: the lug nut socket has no XR Interaction Manager.", this);
                 return false;
             }
 
             wrench.transform.SetPositionAndRotation(anchor.position, anchor.rotation);
-            if (zone.interactionManager != null)
+            manager.SelectEnter((IXRSelectInteractor)zone, (IXRSelectInteractable)grabbable);
+            bool snapped = (wrench.SnappedZone as SnapZoneProperty) == lugNutSnapZone
+                && zone.IsSelecting((IXRSelectInteractable)grabbable);
+            if (!snapped)
             {
-                zone.interactionManager.SelectEnter(
-                    (IXRSelectInteractor)zone, (IXRSelectInteractable)grabbable);
+                Debug.LogWarning($"Cannot place the free wrench: socket selection was refused (active={zone.isActiveAndEnabled}, locked={lugNutSnapZone.IsLocked}, grabbableLocked={grabProperty.IsLocked}, socketActive={zone.socketActive}, selected={zone.hasSelection}).", this);
+            }
+            else
+            {
+                RestoreRecoveryGrabbableLock();
             }
 
-            return true;
+            return snapped;
+        }
+
+        private void RestoreRecoveryGrabbableLock()
+        {
+            // Locking a held item can start an ungrab coroutine; inactive objects defer cleanup to OnEnable.
+            if (recoveryGrabbableToRestore == null || !gameObject.activeInHierarchy
+                || !recoveryGrabbableToRestore.gameObject.activeInHierarchy)
+            {
+                return;
+            }
+
+            GrabbableProperty property = recoveryGrabbableToRestore;
+            recoveryGrabbableToRestore = null;
+            property.RequestLocked(true);
         }
 
         private void RemoveCurrentLugNut()
@@ -633,6 +745,11 @@ namespace TireTraining
             }
 
             firstSnapZonePosition = lugNutSnapZone.transform.position;
+            if (car != null)
+            {
+                firstSnapZoneCarLocalPosition = car.InverseTransformPoint(firstSnapZonePosition);
+            }
+
             firstLugNutPosition = lugNuts[0].position;
 
             if (replacementNuts == null)
@@ -672,11 +789,18 @@ namespace TireTraining
 
         private void MoveSnapZoneToCurrentBolt()
         {
-            Vector3 firstNutPosition = tighteningBolts ? firstReplacementNutPosition : firstLugNutPosition;
-            lugNutSnapZone.transform.position = firstSnapZonePosition
-                + (CurrentNuts[CurrentNutIndex].position - firstNutPosition);
+            lugNutSnapZone.transform.position = CurrentSnapZonePosition;
             Debug.Log($"Wrench snap zone moved to lug bolt {CurrentNutIndex + 1}.", this);
         }
+
+        private Vector3 CurrentCarInitialSnapZonePosition => car != null
+            ? car.TransformPoint(firstSnapZoneCarLocalPosition) : firstSnapZonePosition;
+
+        // The fixed snug origin plus nut displacement includes later car movement exactly once.
+        private Vector3 CurrentSnapZonePosition =>
+            (tighteningBolts ? firstTighteningSnapZonePosition : firstSnapZonePosition)
+            + (CurrentNuts[CurrentNutIndex].position
+                - (tighteningBolts ? firstReplacementNutPosition : firstLugNutPosition));
 
         private void RestoreSnapAnchor()
         {
