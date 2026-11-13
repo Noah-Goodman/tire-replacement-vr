@@ -12,6 +12,9 @@ namespace TireTraining
     /// <summary>
     /// Lives in RoleSelectScene. Connects to Photon's Shared session lobby, tracks which roles the
     /// session list reports as taken, and starts the shared session when a player joins a role.
+    /// With <see cref="SoloMode"/> on, <see cref="TryStartSolo"/> instead starts an offline
+    /// <see cref="GameMode.Single"/> runner as the Assembler, which needs no Photon connection; the lobby
+    /// keeps retrying in the background but hides its retry message.
     /// The NetworkRunner sits on a DontDestroyOnLoad object so it survives the load of MainScene.
     /// </summary>
     [DisallowMultipleComponent]
@@ -23,8 +26,53 @@ namespace TireTraining
         public const int MaxPlayers = 2;
 
         private const int RetryDelayMs = 5000;
+        private const string RetryMessage = "Can't reach the multiplayer service. Retrying…";
 
         private static bool returningToLobby;
+        private static bool soloMode;
+
+        /// <summary>
+        /// True when multiplayer is off: one player does every step alone with no Photon connection.
+        /// False at launch; kept across returns to the lobby within one launch.
+        /// </summary>
+        public static bool SoloMode
+        {
+            get => soloMode;
+            set
+            {
+                if (soloMode == value)
+                {
+                    return;
+                }
+
+                soloMode = value;
+                SoloModeChanged?.Invoke();
+            }
+        }
+
+        /// <summary>Raised when <see cref="SoloMode"/> changes value.</summary>
+        public static event Action SoloModeChanged;
+
+        /// <summary>
+        /// True during a solo run: <see cref="SoloMode"/> is on and the current <see cref="Runner"/> is starting or running
+        /// in <see cref="GameMode.Single"/>. Solo rules in MainScene and GarageScene check this; MainScene with no
+        /// runner stays the no-session case.
+        /// </summary>
+        public static bool IsSoloRun
+        {
+            get
+            {
+                NetworkRunner runner = Runner;
+                return soloMode && runner != null && (runner.IsRunning || runner.IsStarting) && runner.GameMode == GameMode.Single;
+            }
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetSoloMode()
+        {
+            soloMode = false;
+            SoloModeChanged = null;
+        }
 
         /// <summary>The role this device joined with. <see cref="Role.None"/> until <see cref="Join"/> accepts a role.</summary>
         public static Role ChosenRole = Role.None;
@@ -41,7 +89,14 @@ namespace TireTraining
         private bool fetcherTaken;
         private bool assemblerTaken;
         private bool lobbyLoopRunning;
+        private int lobbyLoopGeneration;
+        private int lobbyLoopCount;
+        private int lobbyLoopId;
         private int attemptGeneration;
+
+        // The message area shows RetryMessage while retryShown is set, unless SoloMode hides it; otherwise shownMessage.
+        private string shownMessage;
+        private bool retryShown;
 
         // The LobbyMessage this lobby opened with; it stays on screen until a role is accepted.
         private string returnMessage;
@@ -104,6 +159,16 @@ namespace TireTraining
             }
         }
 
+        private void OnEnable()
+        {
+            SoloModeChanged += RefreshMessage;
+        }
+
+        private void OnDisable()
+        {
+            SoloModeChanged -= RefreshMessage;
+        }
+
         private void OnDestroy()
         {
             if (Runner != null)
@@ -115,13 +180,17 @@ namespace TireTraining
         /// <summary>Creates a runner and joins the lobby, retrying every few seconds until it works or this component is destroyed.</summary>
         private async Task RunLobbyLoop()
         {
-            if (returningToLobby || this == null || !isActiveAndEnabled || lobbyLoopRunning || Runner != null || IsJoining)
+            // A loop left from an earlier attempt generation (a solo start can interrupt one mid-retry) exits at its next check and doesn't block this one.
+            if (returningToLobby || this == null || !isActiveAndEnabled || (lobbyLoopRunning && lobbyLoopGeneration == attemptGeneration) || Runner != null || IsJoining)
             {
                 return;
             }
 
-            lobbyLoopRunning = true;
             int generation = attemptGeneration;
+            int loopId = ++lobbyLoopCount;
+            lobbyLoopRunning = true;
+            lobbyLoopGeneration = generation;
+            lobbyLoopId = loopId;
             try
             {
                 while (!returningToLobby && this != null && isActiveAndEnabled && generation == attemptGeneration && !IsLobbyReady && !IsJoining && Runner == null)
@@ -158,7 +227,7 @@ namespace TireTraining
                     }
 
                     Debug.LogWarning($"SessionLauncher: could not join the session lobby: {failure}");
-                    ShowMessage("Can't reach the multiplayer service. Retrying…");
+                    ShowRetryMessage();
 
                     if (Runner == runner)
                     {
@@ -176,7 +245,7 @@ namespace TireTraining
             }
             finally
             {
-                if (this != null)
+                if (this != null && lobbyLoopId == loopId)
                 {
                     lobbyLoopRunning = false;
                 }
@@ -202,6 +271,26 @@ namespace TireTraining
             JoinFadeToken = fadeToken == 0 ? ScreenFader.CurrentFadeToken : fadeToken;
             int generation = ++attemptGeneration;
             _ = JoinRoutine(runner, generation, JoinFadeToken);
+            return true;
+        }
+
+        /// <summary>
+        /// Starts an offline solo run as the Assembler when <see cref="SoloMode"/> is on; the lobby doesn't need to be ready.
+        /// A rejected caller retains its fade ownership.
+        /// </summary>
+        public bool TryStartSolo(int fadeToken = 0)
+        {
+            if (!SoloMode || returningToLobby || this == null || !isActiveAndEnabled || IsJoining)
+            {
+                return false;
+            }
+
+            IsJoining = true;
+            ChosenRole = Role.Assembler;
+            returnMessage = null;
+            JoinFadeToken = fadeToken == 0 ? ScreenFader.CurrentFadeToken : fadeToken;
+            int generation = ++attemptGeneration;
+            _ = SoloRoutine(generation, JoinFadeToken);
             return true;
         }
 
@@ -286,6 +375,64 @@ namespace TireTraining
             }
         }
 
+        private async Task SoloRoutine(int generation, int fadeToken)
+        {
+            NetworkRunner expected = null;
+            try
+            {
+                NetworkRunner lobbyRunner = Runner;
+                Runner = null;
+                await ShutdownRunner(lobbyRunner);
+                if (!IsCurrentAttempt(generation, null))
+                {
+                    CancelJoinFade(fadeToken);
+                    return;
+                }
+
+                expected = CreateRunner();
+                Runner = expected;
+                StartGameResult result = await StartSoloGame(expected);
+                if (result.Ok)
+                {
+                    // A destroyed lobby launcher is expected after this runner's successful scene load.
+                    if (Runner != expected || (this != null && (!isActiveAndEnabled || generation != attemptGeneration)))
+                    {
+                        CancelJoinFade(fadeToken);
+                    }
+
+                    return;
+                }
+
+                if (!IsCurrentAttempt(generation, expected))
+                {
+                    CancelJoinFade(fadeToken);
+                    return;
+                }
+
+                Debug.LogWarning($"SessionLauncher: solo StartGame failed ({result.ShutdownReason}): {result.ErrorMessage}");
+                await FailJoin(result.ErrorMessage, expected, generation, fadeToken);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"SessionLauncher: solo start failed: {e.Message}");
+                if (!IsCurrentAttempt(generation, expected))
+                {
+                    CancelJoinFade(fadeToken);
+                    return;
+                }
+
+                try
+                {
+                    await FailJoin(e.Message, expected, generation, fadeToken);
+                }
+                catch (Exception inner)
+                {
+                    CancelJoinFade(fadeToken);
+                    Debug.LogWarning($"SessionLauncher: recovery failed: {inner.Message}");
+                }
+            }
+        }
+
         private async Task FailJoin(string reason, NetworkRunner expected, int generation, int fadeToken)
         {
             if (!IsCurrentAttempt(generation, expected))
@@ -328,6 +475,17 @@ namespace TireTraining
                 Scene = SceneRef.FromIndex(MainSceneIndex),
                 SceneManager = runner.GetComponent<NetworkSceneManagerDefault>(),
                 PlayerCount = MaxPlayers
+            });
+        }
+
+        private static Task<StartGameResult> StartSoloGame(NetworkRunner runner)
+        {
+            return runner.StartGame(new StartGameArgs
+            {
+                GameMode = GameMode.Single,
+                Scene = SceneRef.FromIndex(MainSceneIndex),
+                SceneManager = runner.GetComponent<NetworkSceneManagerDefault>(),
+                PlayerCount = 1
             });
         }
 
@@ -412,9 +570,24 @@ namespace TireTraining
 
         private void ShowMessage(string text)
         {
+            shownMessage = text;
+            retryShown = false;
+            RefreshMessage();
+        }
+
+        // In solo mode the retry text is hidden and the area shows returnMessage or nothing.
+        private void ShowRetryMessage()
+        {
+            shownMessage = returnMessage;
+            retryShown = true;
+            RefreshMessage();
+        }
+
+        private void RefreshMessage()
+        {
             if (messageText != null)
             {
-                messageText.text = text ?? "";
+                messageText.text = (retryShown && !SoloMode ? RetryMessage : shownMessage) ?? "";
             }
         }
 

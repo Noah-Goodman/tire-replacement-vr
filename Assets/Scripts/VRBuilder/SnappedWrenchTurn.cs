@@ -70,6 +70,7 @@ namespace TireTraining
         private MaterialPropertyBlock originalWheelProperties;
         private bool wheelWasGrabbed;
         private GrabbableProperty recoveryGrabbableToRestore;
+        private float nextReplacementPlacementTime;
 
         private void Awake()
         {
@@ -136,6 +137,8 @@ namespace TireTraining
                 selectingHand = null;
                 return;
             }
+
+            PrepareMultiplayerReplacementWrench();
 
             bool isSnapped = wrench.IsSnapped;
             if (isSnapped && lugNutSnapZone != null
@@ -482,6 +485,31 @@ namespace TireTraining
             Debug.Log(wrenchMoved
                 ? "Remove each lug nut with one more full counterclockwise turn. Wrench returned to nut 1."
                 : "Remove each lug nut with one more full counterclockwise turn. Place the wrench on nut 1.", this);
+        }
+
+        // The multiplayer process reaches this step after installing the replacement nuts. The wrench
+        // was returned to its bench after removal, and neither role can fetch it during this step.
+        // Prepare it before the step's snapped condition, rather than waiting for the first turn condition.
+        private void PrepareMultiplayerReplacementWrench()
+        {
+            SessionState state = SessionState.Instance;
+            if (SessionLauncher.Runner == null || SessionLauncher.IsSoloRun || state == null || state.Finished
+                || state.Chapter != 3 || state.Step.ToString() != "Put wrench into place"
+                || Time.unscaledTime < nextReplacementPlacementTime)
+            {
+                return;
+            }
+
+            nextReplacementPlacementTime = Time.unscaledTime + 1f;
+            if (!tighteningBolts)
+                BeginTightening();
+
+            if (!tighteningBolts || lugNutSnapZone == null)
+                return;
+
+            var zone = lugNutSnapZone.SnapZone;
+            if (zone != null)
+                PlaceWrenchOnCurrentBolt(zone, zone.Anchor);
         }
 
         /// <summary>

@@ -6,7 +6,8 @@ namespace TireTraining
     /// Switches objects and components off on the device of every role except <see cref="activeFor"/>.
     /// Once <see cref="RoleBootstrap.LocalRole"/> is known (already, or when <see cref="RoleBootstrap.LocalRoleReady"/>
     /// fires) and differs from <see cref="activeFor"/>, the listed objects are deactivated and the listed behaviours
-    /// are disabled, once. With no network session the local role stays None and nothing is changed.
+    /// are disabled, once. With no network session the local role stays None and nothing is changed; in a solo run
+    /// (<see cref="SessionLauncher.IsSoloRun"/>) nothing is changed either, because the one player does both roles' parts.
     /// The gate may sit on one of its own objects: it applies once and stops listening before that object goes inactive.
     /// </summary>
     public sealed class RoleGate : MonoBehaviour
@@ -40,7 +41,7 @@ namespace TireTraining
 
         private void Apply(Role role)
         {
-            if (applied || role == Role.None || role == activeFor)
+            if (applied || role == Role.None || role == activeFor || SessionLauncher.IsSoloRun)
             {
                 return;
             }

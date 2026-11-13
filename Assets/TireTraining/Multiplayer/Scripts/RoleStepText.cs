@@ -32,6 +32,9 @@ namespace TireTraining
             [TextArea] [SerializeField] private string fetcherText;
             [TextArea] [SerializeField] private string assemblerText;
 
+            [Tooltip("Shown on the solo player's board; empty uses the Assembler text.")]
+            [TextArea] [SerializeField] private string soloText;
+
             [Tooltip("The item the Fetcher works with in this step.")]
             [SerializeField] private FetchItem item;
 
@@ -49,6 +52,9 @@ namespace TireTraining
 
             /// <summary>What the Assembler should do in this step.</summary>
             public string AssemblerText => assemblerText;
+
+            /// <summary>What the solo player should do in this step; empty means the Assembler text applies.</summary>
+            public string SoloText => soloText;
 
             /// <summary>The item the Fetcher works with in this step.</summary>
             public FetchItem Item => item;

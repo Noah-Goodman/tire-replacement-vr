@@ -16,6 +16,8 @@ namespace TireTraining
     /// <summary>
     /// Completes when the receiving role grabs the item after the step starts and the giving role last carried it.
     /// Direct takes and pickups after release or departure count; earlier handoff records only establish the baseline.
+    /// In a solo run (<see cref="SessionLauncher.IsSoloRun"/>) the step also completes while the item's holder is the
+    /// local role, whether the player already holds it when the step starts or picks it up later, in either direction.
     /// </summary>
     [DataContract(IsReference = true)]
     public class HandoffCondition : Condition<HandoffCondition.EntityData>
@@ -90,7 +92,14 @@ namespace TireTraining
 
             protected override bool CheckIfCompleted()
             {
-                return handoffSeen;
+                return handoffSeen || HeldBySoloPlayer();
+            }
+
+            private bool HeldBySoloPlayer()
+            {
+                Role local = RoleBootstrap.LocalRole;
+                return SessionLauncher.IsSoloRun && local != Role.None && grabbable != null && grabbable.IsSpawned
+                    && grabbable.Holder == local;
             }
 
             public override void End()

@@ -20,6 +20,7 @@ namespace TireTraining
     ///  - Take cue, on the Assembler's device: within <see cref="takeDistance"/> of the main camera, an item held by a
     ///    present Fetcher or unheld and last carried by the Fetcher is highlighted steadily in the Assembler color.
     ///    A departed Fetcher's stale holder value must clear before the item is treated as a pickup.
+    ///  - In a solo run (<see cref="SessionLauncher.IsSoloRun"/>) the local player gets the Fetcher's pulse and no take cue.
     /// Neither cue shows once the process is finished.
     ///
     /// Haptics, on both devices, for every tagged item: when the local hand takes the item from the other role the
@@ -285,7 +286,7 @@ namespace TireTraining
                 return Cue.None;
             }
 
-            if (local == Role.Fetcher)
+            if (local == Role.Fetcher || SessionLauncher.IsSoloRun)
             {
                 return grabbable.Holder == Role.None ? Cue.Pulse : Cue.None;
             }

@@ -20,6 +20,9 @@ namespace TireTraining
     /// On the Fetcher's device, where the VR Builder process doesn't run, the item's lockable properties are unlocked
     /// about once a second so the filter alone decides and the item can be stored in the garage sockets.
     /// The Assembler's device leaves the locks to the process.
+    /// In a solo run (<see cref="SessionLauncher.IsSoloRun"/>) every hand may grab a spawned item and the locks decide;
+    /// the item's lockable properties are unlocked about once a second only while it is <see cref="SessionState.Needed"/>,
+    /// and every other lock is left to the process.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class RoleGrabGate : MonoBehaviour, IXRSelectFilter, IXRHoverFilter
@@ -66,7 +69,19 @@ namespace TireTraining
 
         private void Update()
         {
-            if (RoleBootstrap.LocalRole != Role.Fetcher || Time.unscaledTime < nextUnlockTime)
+            if (SessionLauncher.IsSoloRun)
+            {
+                if (!IsNeeded())
+                {
+                    return;
+                }
+            }
+            else if (RoleBootstrap.LocalRole != Role.Fetcher)
+            {
+                return;
+            }
+
+            if (Time.unscaledTime < nextUnlockTime)
             {
                 return;
             }
@@ -110,15 +125,14 @@ namespace TireTraining
                 return false;
             }
 
+            if (SessionLauncher.IsSoloRun)
+            {
+                return true;
+            }
+
             if (local == Role.Fetcher)
             {
-                if (grabbable.Holder == Role.Fetcher)
-                {
-                    return true;
-                }
-
-                SessionState state = SessionState.Instance;
-                return state != null && itemTag != null && itemTag.Item != FetchItem.None && state.Needed == itemTag.Item;
+                return grabbable.Holder == Role.Fetcher || IsNeeded();
             }
 
             if (grabbable.Holder == Role.Fetcher || grabbable.Holder == Role.Assembler)
@@ -132,6 +146,13 @@ namespace TireTraining
             }
 
             return grabbable.HandoffCount > 0 ? grabbable.LastHandoffTo == Role.Assembler : startsAtCar;
+        }
+
+        // True while the current step works with this item.
+        private bool IsNeeded()
+        {
+            SessionState state = SessionState.Instance;
+            return state != null && itemTag != null && itemTag.Item != FetchItem.None && state.Needed == itemTag.Item;
         }
     }
 }

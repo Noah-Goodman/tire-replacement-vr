@@ -6,9 +6,12 @@ using UnityEngine.Serialization;
 namespace TireTraining
 {
     /// <summary>
-    /// A role's portal in RoleSelectScene. It has three looks: Connecting (no session list yet, or a join running),
-    /// Taken, and Free. When the player's head enters the ring of a free portal, the portal flares, plays a whoosh,
-    /// fades the view to black and then calls <see cref="SessionLauncher.Join"/>.
+    /// A role's portal in RoleSelectScene. It has four looks: Connecting (no session list yet, or a join running),
+    /// Taken, Free, and Unavailable (all grey). When the player's head enters the ring of a free portal, the portal
+    /// flares, plays a whoosh, fades the view to black and then calls <see cref="SessionLauncher.TryJoin"/>.
+    /// While <see cref="SessionLauncher.SoloMode"/> is on, the Fetcher portal is Unavailable and can't be entered,
+    /// and the Assembler portal reads SOLO MODE, is Free whenever the launcher isn't joining, and calls
+    /// <see cref="SessionLauncher.TryStartSolo"/> instead.
     /// Entry is the head's horizontal (XZ) distance to <see cref="center"/> being less than <see cref="radius"/>;
     /// no colliders are involved. Every part is optional: a null reference skips that part.
     /// Colors are changed through property blocks only, so the shared materials are never instanced.
@@ -22,6 +25,7 @@ namespace TireTraining
             Connecting,
             Taken,
             Free,
+            Unavailable,
         }
 
         private const float FlareSeconds = 0.4f;
@@ -44,32 +48,33 @@ namespace TireTraining
         [Tooltip("The player's head. Defaults to the main camera.")]
         [SerializeField] private Transform head;
 
-        [Tooltip("The sign's status line: Connecting…, TAKEN, or the role's one-line description.")]
+        [Tooltip("The sign's status line: Connecting…, TAKEN, Multiplayer off, or the role's one-line description (Do every step yourself in solo mode).")]
         [FormerlySerializedAs("label")]
         [SerializeField] private TMP_Text statusLabel;
-        [Tooltip("Optional. Grey when connecting or taken; the material's role color when free.")]
+        [Tooltip("Optional. Grey unless the portal is free; the material's role color when free.")]
         [SerializeField] private Renderer ringRenderer;
-        [Tooltip("Optional. Grey when connecting or taken; the material's role color when free.")]
+        [Tooltip("Optional. Grey unless the portal is free; the material's role color when free.")]
         [SerializeField] private Renderer discRenderer;
-        [Tooltip("Optional. Off unless the portal is free.")]
+        [Tooltip("Optional. On when the portal is free, grey when unavailable, off otherwise.")]
         [SerializeField] private Renderer haloRenderer;
-        [Tooltip("Optional. Off unless the portal is free.")]
+        [Tooltip("Optional. On when the portal is free, grey when unavailable, off otherwise.")]
         [SerializeField] private Renderer beamRenderer;
         [Tooltip("Optional. Emits only while the portal is free.")]
         [SerializeField] private ParticleSystem particles;
-        [Tooltip("Optional. On only while the portal is free.")]
+        [Tooltip("Optional. On when the portal is free, grey when unavailable, off otherwise.")]
         [SerializeField] private Light portalLight;
         [Tooltip("Optional. Turned about the vertical axis to face the player's head.")]
         [SerializeField] private Transform signRoot;
         [Tooltip("Optional. Role color when free, grey otherwise.")]
         [SerializeField] private SpriteRenderer signIcon;
-        [Tooltip("Optional. Reads FETCHER or ASSEMBLER; role color when free, grey otherwise.")]
+        [Tooltip("Optional. Reads FETCHER or ASSEMBLER (SOLO MODE for the Assembler in solo mode); role color when free, grey otherwise.")]
         [SerializeField] private TMP_Text nameLabel;
         [Tooltip("Optional. A 2D source with Play On Awake off; plays the whoosh on entry.")]
         [SerializeField] private AudioSource audioSource;
 
         private MaterialPropertyBlock block;
         private Look appliedLook = Look.Unset;
+        private bool appliedSolo;
         private bool inside;
         private bool entering;
         private Coroutine flare;
@@ -82,6 +87,9 @@ namespace TireTraining
         private float lightBaseIntensity;
         private Color haloBaseColor = Color.white;
         private Color beamBaseColor = Color.white;
+
+        private bool lightColorCached;
+        private Color lightBaseColor = Color.white;
 
         public Role Role => role;
 
@@ -124,9 +132,12 @@ namespace TireTraining
                 head = Camera.main.transform;
             }
 
-            bool connecting = IsConnecting();
-            bool available = !connecting && launcher.IsRoleAvailable(role);
-            ApplyLook(connecting ? Look.Connecting : available ? Look.Free : Look.Taken);
+            bool solo = SessionLauncher.SoloMode;
+            bool available = IsFree();
+            ApplyLook(solo && role == Role.Fetcher ? Look.Unavailable
+                : available ? Look.Free
+                : IsConnecting() ? Look.Connecting
+                : Look.Taken, solo);
 
             FaceHead();
             UpdateEntry(available);
@@ -139,6 +150,11 @@ namespace TireTraining
 
         private bool IsFree()
         {
+            if (SessionLauncher.SoloMode)
+            {
+                return role == Role.Assembler && launcher != null && !launcher.IsJoining;
+            }
+
             return !IsConnecting() && launcher.IsRoleAvailable(role);
         }
 
@@ -232,7 +248,8 @@ namespace TireTraining
             {
                 // A synchronous scene unload during acceptance must preserve the handed-off black view.
                 handedToJoin = true;
-                if (launcher.TryJoin(role, fadeToken))
+                bool accepted = SessionLauncher.SoloMode ? launcher.TryStartSolo(fadeToken) : launcher.TryJoin(role, fadeToken);
+                if (accepted)
                 {
                     fadeToken = 0;
                     FinishEntry();
@@ -361,26 +378,31 @@ namespace TireTraining
             appliedLook = Look.Unset;
         }
 
-        private void ApplyLook(Look look)
+        private void ApplyLook(Look look, bool solo)
         {
-            if (look == appliedLook)
+            if (look == appliedLook && solo == appliedSolo)
             {
                 return;
             }
 
             appliedLook = look;
+            appliedSolo = solo;
             bool free = look == Look.Free;
+            bool unavailable = look == Look.Unavailable;
+            bool soloAssembler = solo && role == Role.Assembler;
 
             if (statusLabel != null)
             {
-                statusLabel.text = look == Look.Connecting ? "Connecting…"
+                statusLabel.text = unavailable ? "Multiplayer off"
+                    : soloAssembler ? "Do every step yourself"
+                    : look == Look.Connecting ? "Connecting…"
                     : look == Look.Taken ? "TAKEN"
                     : StatusLine(role);
             }
 
             if (nameLabel != null)
             {
-                nameLabel.text = role.GetDisplayName().ToUpperInvariant();
+                nameLabel.text = soloAssembler ? "SOLO MODE" : role.GetDisplayName().ToUpperInvariant();
                 nameLabel.color = free ? role.GetColor() : GreyIcon;
             }
 
@@ -405,21 +427,34 @@ namespace TireTraining
                     grey.a = SharedBaseColor(discRenderer).a;
                     SetGrey(discRenderer, grey);
                 }
+
+                if (unavailable)
+                {
+                    SetGreyKeepAlpha(haloRenderer);
+                    SetGreyKeepAlpha(beamRenderer);
+                }
             }
 
             if (haloRenderer != null)
             {
-                haloRenderer.enabled = free;
+                haloRenderer.enabled = free || unavailable;
             }
 
             if (beamRenderer != null)
             {
-                beamRenderer.enabled = free;
+                beamRenderer.enabled = free || unavailable;
             }
 
             if (portalLight != null)
             {
-                portalLight.enabled = free;
+                if (!lightColorCached)
+                {
+                    lightColorCached = true;
+                    lightBaseColor = portalLight.color;
+                }
+
+                portalLight.color = unavailable ? GreyRing : lightBaseColor;
+                portalLight.enabled = free || unavailable;
             }
 
             if (particles != null)
@@ -451,6 +486,18 @@ namespace TireTraining
             {
                 r.SetPropertyBlock(null);
             }
+        }
+
+        private void SetGreyKeepAlpha(Renderer r)
+        {
+            if (r == null)
+            {
+                return;
+            }
+
+            Color grey = GreyRing;
+            grey.a = SharedBaseColor(r).a;
+            SetGrey(r, grey);
         }
 
         private void SetGrey(Renderer r, Color color)

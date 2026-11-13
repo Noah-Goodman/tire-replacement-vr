@@ -1,0 +1,4 @@
+Town & Suburb Kit Free by heyheythere - https://heyheythere.itch.io/town-suburb-kit-free - CC BY 4.0
+License: https://creativecommons.org/licenses/by/4.0/
+Version 1.1.0. Imported only the house, straight street, lawn, and shared textures.
+Unity adaptation: shared URP material, scene placement, tiled lawn and street. No sedan imported.

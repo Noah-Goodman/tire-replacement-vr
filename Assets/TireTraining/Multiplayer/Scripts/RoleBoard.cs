@@ -15,6 +15,9 @@ namespace TireTraining
     /// by a present Fetcher. Otherwise, steps with <see cref="RoleStepText.Entry.RequiresFetcher"/> show
     /// "Waiting for the Fetcher to join" when the Fetcher is absent; all other cases use the entry's Assembler text.
     /// A departed Fetcher's stale holder value must clear before the item is treated as a pickup.
+    /// In a solo run (<see cref="SessionLauncher.IsSoloRun"/>) the Assembler board is the solo player's board: it shows
+    /// the entry's <see cref="RoleStepText.Entry.SoloText"/>, or its Assembler text when that is empty, with no pickup
+    /// or waiting message.
     ///
     /// The board follows <see cref="SessionState.Instance"/>, binding to it whenever it changes, so it works when the
     /// state spawns after the board or despawns. It also refreshes when <see cref="RoleBootstrap.LocalRoleReady"/>
@@ -163,6 +166,11 @@ namespace TireTraining
             if (entry == null)
             {
                 return null;
+            }
+
+            if (SessionLauncher.IsSoloRun)
+            {
+                return string.IsNullOrEmpty(entry.SoloText) ? entry.AssemblerText : entry.SoloText;
             }
 
             if (!bound.Finished && entry.Handoff == HandoffDirection.FetcherToAssembler && entry.Item != FetchItem.None)
